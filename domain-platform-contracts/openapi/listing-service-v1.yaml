@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: Domain Listing Service API
+  version: 1.0.0
+  description: |
+    The source-of-truth REST contract for property listing management and public discovery.
+    The API is versioned in the URI, uses cursor pagination, and returns RFC 9457 Problem Details for errors.
+servers:
+  - url: https://api.domain.example/v1
+tags:
+  - name: Properties
+paths:
+  /properties:
+    post:
+      tags: [Properties]
+      summary: Create a property listing
+      operationId: createProperty
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePropertyRequest'
+      responses:
+        '201':
+          description: Listing created as a draft.
+          headers:
+            ETag:
+              $ref: '#/components/headers/EntityTag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags: [Properties]
+      summary: Browse active property listings
+      operationId: listProperties
+      parameters:
+        - $ref: '#/components/parameters/Suburb'
+        - $ref: '#/components/parameters/ListingType'
+        - $ref: '#/components/parameters/PropertyType'
+        - $ref: '#/components/parameters/MinPrice'
+        - $ref: '#/components/parameters/MaxPrice'
+        - $ref: '#/components/parameters/MinBedrooms'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A stable, cursor-paginated page of active listings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /properties/{propertyId}:
+    get:
+      tags: [Properties]
+      summary: Get one property listing
+      operationId: getProperty
+      parameters:
+        - $ref: '#/components/parameters/PropertyId'
+      responses:
+        '200':
+          description: Property listing found.
+          headers:
+            ETag:
+              $ref: '#/components/headers/EntityTag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Properties]
+      summary: Replace an agent-owned property listing
+      operationId: updateProperty
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PropertyId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePropertyRequest'
+      responses:
+        '200':
+          description: Listing updated.
+          headers:
+            ETag:
+              $ref: '#/components/headers/EntityTag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+  /properties/{propertyId}/status:
+    patch:
+      tags: [Properties]
+      summary: Transition an agent-owned listing's lifecycle status
+      operationId: changePropertyStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PropertyId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePropertyStatusRequest'
+      responses:
+        '200':
+          description: Status transition succeeded.
+          headers:
+            ETag:
+              $ref: '#/components/headers/EntityTag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+  /properties/{propertyId}/media/upload-url:
+    post:
+      tags: [Properties]
+      summary: Create a short-lived direct image upload URL for an agent-owned property
+      operationId: createPropertyImageUploadUrl
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PropertyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignImageUploadRequest'
+      responses:
+        '200':
+          description: A constrained S3 PUT URL. The client must use it before it expires.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignImageUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    PropertyId:
+      name: propertyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: A client-generated UUID retained for at least 24 hours; repeated requests return the original result.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: The entity tag received from GET or a prior mutation. Prevents lost updates.
+      schema:
+        type: string
+        example: '"3"'
+    Suburb:
+      name: suburb
+      in: query
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    ListingType:
+      name: listingType
+      in: query
+      schema:
+        $ref: '#/components/schemas/ListingType'
+    PropertyType:
+      name: propertyType
+      in: query
+      schema:
+        $ref: '#/components/schemas/PropertyType'
+    MinPrice:
+      name: minPrice
+      in: query
+      schema:
+        type: number
+        minimum: 0
+    MaxPrice:
+      name: maxPrice
+      in: query
+      schema:
+        type: number
+        minimum: 0
+    MinBedrooms:
+      name: minBedrooms
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by a previous page.
+      schema:
+        type: string
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+  headers:
+    EntityTag:
+      description: Optimistic-locking entity tag derived from the listing version.
+      schema:
+        type: string
+        example: '"3"'
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Unauthorized:
+      description: Authentication is required or invalid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Forbidden:
+      description: The authenticated agent does not own this listing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Conflict:
+      description: The requested operation conflicts with the current resource state.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    PreconditionFailed:
+      description: The supplied entity tag is stale.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+  schemas:
+    CreatePropertyRequest:
+      type: object
+      required: [title, propertyType, listingType, address]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        propertyType:
+          $ref: '#/components/schemas/PropertyType'
+        listingType:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type: number
+          minimum: 0
+          multipleOf: 0.01
+        bedrooms:
+          type: integer
+          minimum: 0
+          maximum: 50
+        bathrooms:
+          type: integer
+          minimum: 0
+          maximum: 50
+        parkingSpaces:
+          type: integer
+          minimum: 0
+          maximum: 50
+        landSizeSqm:
+          type: number
+          minimum: 0
+        address:
+          $ref: '#/components/schemas/Address'
+    UpdatePropertyRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreatePropertyRequest'
+    ChangePropertyStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/PropertyStatus'
+    Property:
+      type: object
+      required: [id, agentId, title, propertyType, listingType, address, status, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        propertyType:
+          $ref: '#/components/schemas/PropertyType'
+        listingType:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type: number
+        bedrooms:
+          type: integer
+        bathrooms:
+          type: integer
+        parkingSpaces:
+          type: integer
+        landSizeSqm:
+          type: number
+        address:
+          $ref: '#/components/schemas/Address'
+        status:
+          $ref: '#/components/schemas/PropertyStatus'
+        version:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Address:
+      type: object
+      required: [addressLine, suburb, state, postcode, latitude, longitude]
+      properties:
+        addressLine:
+          type: string
+          maxLength: 255
+        suburb:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          minLength: 2
+          maxLength: 10
+        postcode:
+          type: string
+          minLength: 4
+          maxLength: 10
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+    PropertyPage:
+      type: object
+      required: [items, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Property'
+        nextCursor:
+          type: [string, 'null']
+        pageSize:
+          type: integer
+    PropertyType:
+      type: string
+      enum: [HOUSE, APARTMENT, TOWNHOUSE, LAND, UNIT]
+    ListingType:
+      type: string
+      enum: [SALE, RENT]
+    PropertyStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, UNDER_OFFER, SOLD, RENTED, WITHDRAWN]
+    ProblemDetail:
+      type: object
+      required: [type, title, status, detail, instance, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        traceId:
+          type: string
+    PresignImageUploadRequest:
+      type: object
+      required: [contentType, contentLength, displayOrder]
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 26214400
+        displayOrder:
+          type: integer
+          minimum: 0
+          maximum: 32767
+    PresignImageUploadResponse:
+      type: object
+      required: [mediaId, uploadUrl, expiresAt]
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        uploadUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time

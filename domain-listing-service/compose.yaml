@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: listing_db
+      POSTGRES_USER: listing_user
+      POSTGRES_PASSWORD: listing_password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U listing_user -d listing_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - listing-postgres-data:/var/lib/postgresql/data
+volumes:
+  listing-postgres-data:

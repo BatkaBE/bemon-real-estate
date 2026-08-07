@@ -1,0 +1,48 @@
+asyncapi: 3.0.0
+info:
+  title: Domain Property Events
+  version: 1.0.0
+  description: Versioned events emitted by the Listing bounded context through the transactional outbox.
+servers:
+  kafka:
+    host: kafka.domain.internal:9092
+    protocol: kafka
+channels:
+  propertyUpdated:
+    address: property.updated.v1
+    messages:
+      propertyUpdated:
+        $ref: '#/components/messages/PropertyUpdated'
+operations:
+  publishPropertyUpdated:
+    action: send
+    channel:
+      $ref: '#/channels/propertyUpdated'
+components:
+  messages:
+    PropertyUpdated:
+      name: PropertyUpdated
+      payload:
+        $ref: '#/components/schemas/PropertyUpdatedEvent'
+  schemas:
+    PropertyUpdatedEvent:
+      type: object
+      required: [eventId, eventType, occurredAt, aggregateId, aggregateVersion, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          const: property.updated.v1
+        occurredAt:
+          type: string
+          format: date-time
+        aggregateId:
+          type: string
+          format: uuid
+        aggregateVersion:
+          type: integer
+          minimum: 0
+        data:
+          type: object
+          description: The full search-index projection; consumers must tolerate additive fields.
