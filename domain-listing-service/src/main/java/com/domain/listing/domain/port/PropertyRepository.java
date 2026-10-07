@@ -20,4 +20,7 @@ public interface PropertyRepository {
             PropertySearchCriteria criteria,
             PropertyCursor cursor,
             int maximumResults);
+
+    /** Finds only one agent's listings across all lifecycle states. */
+    List<Property> findOwned(UUID agentId, PropertyCursor cursor, int maximumResults);
 }

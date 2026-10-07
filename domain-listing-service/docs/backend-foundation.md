@@ -19,6 +19,11 @@
 - Public browse uses a keyset cursor over `(created_at DESC, id DESC)`, with partial PostgreSQL indexes for active listings. A later Search Service will own full-text, geo, and faceted search.
 - Media upload uses a private S3 bucket and 10-minute presigned PUT URL. The server-generated key does not include a user-controlled filename; only JPEG, PNG, and WebP images up to 25 MB are accepted in this first slice.
 - Listing mutations validate the Identity issuer, require `ROLE_AGENT`, and require the `listings:write` OAuth scope. Buyers cannot create or modify listings even if a client requests that scope.
+- Draft and withdrawn detail responses require the owning agent's subject; public requests receive `404`.
+- Concurrent create retries acquire a transaction-scoped PostgreSQL advisory lock before reading or writing their idempotency record. Response snapshots retain the original body and ETag after later edits; expired keys can be reused without deleting listings.
+- Pre-upgrade idempotency records without a snapshot still recognize the previous fingerprint and return the current listing state, matching their former behavior. Original historical response bodies cannot be recovered for those records.
+- Every committed create, replacement, and status transition writes a `property.updated.v1` projection into `outbox_events` in the same transaction. Publishing to Kafka is deferred; events remain unpublished until a delivery worker is implemented.
+- Object storage is opt-in with `MEDIA_ENABLED=true`. The default local configuration returns a Problem Details `503` and rolls back pending media metadata.
 
 ## Test commands
 
@@ -28,3 +33,5 @@
 ## Deferred deliberately
 
 Kafka delivery, OpenSearch indexing, rate limiting, Kubernetes, and payment workflows are introduced after the transactional Listing API is tested locally. Their contracts are established now so later extraction does not break clients.
+
+The image API currently creates pending uploads only. Confirmation through S3 HEAD/content verification, `UPLOADED` transitions, signed download URLs, duplicate display-order handling, and stale-upload cleanup remain unfinished. Do not treat presigning alone as an implemented media lifecycle.

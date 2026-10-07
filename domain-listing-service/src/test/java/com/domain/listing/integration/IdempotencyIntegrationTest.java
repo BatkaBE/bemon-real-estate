@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.domain.listing.application.PropertyApplicationService;
 import com.domain.listing.domain.model.ListingType;
-import com.domain.listing.domain.model.Property;
+import com.domain.listing.domain.model.PropertySnapshot;
 import com.domain.listing.domain.model.PropertyAddress;
 import com.domain.listing.domain.model.PropertyDraft;
 import com.domain.listing.domain.model.PropertyType;
@@ -48,10 +48,10 @@ class IdempotencyIntegrationTest {
                 new PropertyAddress("10 Example Street", "Richmond", "VIC", "3121",
                         -37.8183, 144.9985));
 
-        final Property first = propertyApplicationService.create(agentId, idempotencyKey, draft);
-        final Property retry = propertyApplicationService.create(agentId, idempotencyKey, draft);
+        final PropertySnapshot first = propertyApplicationService.create(agentId, idempotencyKey, draft);
+        final PropertySnapshot retry = propertyApplicationService.create(agentId, idempotencyKey, draft);
 
-        assertThat(retry.getId()).isEqualTo(first.getId());
-        assertThat(retry.getAgentId()).isEqualTo(agentId);
+        assertThat(retry.id()).isEqualTo(first.id());
+        assertThat(retry.agentId()).isEqualTo(agentId);
     }
 }

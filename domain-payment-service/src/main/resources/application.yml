@@ -1,0 +1,45 @@
+server:
+  tomcat:
+    max-http-form-post-size: 64KB
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
+    username: ${DB_USERNAME:payment_user}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${IDENTITY_ISSUER_URI:http://localhost:9000}
+          jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:9000/oauth2/jwks}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+app:
+  bounds:
+    enabled: ${REQUEST_BOUNDS_ENABLED:false}
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  identity-url: ${IDENTITY_INTERNAL_URL:http://localhost:9000}
+  listing-url: ${LISTING_INTERNAL_URL:http://localhost:8080}
+  provider: ${PAYMENT_PROVIDER:disabled}
+  featured-price: ${FEATURED_PRICE_MNT:20000}
+  subscription-price: ${SUBSCRIPTION_PRICE_MNT:99000}
+  qpay:
+    url: ${QPAY_API_URL:https://merchant-sandbox.qpay.mn}
+    client-id: ${QPAY_CLIENT_ID:}
+    secret: ${QPAY_CLIENT_SECRET:}
+    invoice-code: ${QPAY_INVOICE_CODE:}
+    callback-origin: ${QPAY_CALLBACK_ORIGIN:}

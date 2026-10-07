@@ -8,4 +8,9 @@ import jakarta.validation.constraints.Size;
 public record RegisterUserRequest(
         @NotBlank @Email @Size(max = 320) String email,
         @NotBlank @Size(max = 72) String password) {
+    /** Prevents debug request logging from serializing the plaintext password via record toString. */
+    @Override
+    public String toString() {
+        return "RegisterUserRequest[email=" + email + ", password=[REDACTED]]";
+    }
 }

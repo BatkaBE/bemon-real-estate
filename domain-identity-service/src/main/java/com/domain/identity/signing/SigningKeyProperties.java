@@ -4,10 +4,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
+import org.springframework.context.annotation.Profile;
 import org.springframework.validation.annotation.Validated;
 
 /** Required production configuration for loading the stable JWT signing key. */
 @Validated
+@Profile("!dev")
 @ConfigurationProperties(prefix = "app.signing")
 public record SigningKeyProperties(
         @NotNull Resource keystoreLocation,

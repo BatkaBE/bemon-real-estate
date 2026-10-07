@@ -3,6 +3,7 @@ package com.domain.listing.application;
 import com.domain.listing.domain.model.PropertyCursor;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.DateTimeException;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -26,7 +27,7 @@ final class CursorCodec {
                 throw new IllegalArgumentException("Cursor has an invalid format");
             }
             return new PropertyCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | DateTimeException exception) {
             throw new IllegalArgumentException("Cursor has an invalid format", exception);
         }
     }

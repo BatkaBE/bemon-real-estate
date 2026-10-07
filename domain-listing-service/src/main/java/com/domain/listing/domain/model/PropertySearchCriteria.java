@@ -9,5 +9,11 @@ public record PropertySearchCriteria(
         PropertyType propertyType,
         BigDecimal minPrice,
         BigDecimal maxPrice,
-        Integer minBedrooms) {
+        Integer minBedrooms,
+        PriceCurrency currency) {
+    /** Keeps the public browse call signature for clients without a currency filter. */
+    public PropertySearchCriteria(final String suburb, final ListingType listingType, final PropertyType propertyType,
+            final BigDecimal minPrice, final BigDecimal maxPrice, final Integer minBedrooms) {
+        this(suburb, listingType, propertyType, minPrice, maxPrice, minBedrooms, null);
+    }
 }

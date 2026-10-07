@@ -46,3 +46,8 @@ components:
         data:
           type: object
           description: The full search-index projection; consumers must tolerate additive fields.
+          properties:
+            currency:
+              type: string
+              enum: [MNT, AUD]
+              description: Amounts keep their own denomination. Missing currency in pre-upgrade projections means AUD.

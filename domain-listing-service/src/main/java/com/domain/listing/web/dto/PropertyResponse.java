@@ -2,8 +2,10 @@ package com.domain.listing.web.dto;
 
 import com.domain.listing.domain.model.ListingType;
 import com.domain.listing.domain.model.Property;
+import com.domain.listing.domain.model.PropertySnapshot;
 import com.domain.listing.domain.model.PropertyStatus;
 import com.domain.listing.domain.model.PropertyType;
+import com.domain.listing.domain.model.PriceCurrency;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -24,18 +26,24 @@ public record PropertyResponse(
         PropertyStatus status,
         long version,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        PriceCurrency currency) {
 
     /** Maps a Listing aggregate without exposing its JPA shape to the HTTP API. */
     public static PropertyResponse from(final Property property) {
+        return from(PropertySnapshot.from(property));
+    }
+
+    /** Maps an immutable create snapshot without changing the response on a retry. */
+    public static PropertyResponse from(final PropertySnapshot property) {
         return new PropertyResponse(
-                property.getId(), property.getAgentId(), property.getTitle(),
-                property.getPropertyType(), property.getListingType(), property.getPrice(),
-                property.getBedrooms(), property.getBathrooms(), property.getParkingSpaces(),
-                property.getLandSizeSqm(),
-                new PropertyAddressResponse(property.getAddressLine(), property.getSuburb(),
-                        property.getState(), property.getPostcode(), property.getLatitude(),
-                        property.getLongitude()),
-                property.getStatus(), property.getVersion(), property.getCreatedAt(), property.getUpdatedAt());
+                property.id(), property.agentId(), property.title(),
+                property.propertyType(), property.listingType(), property.price(),
+                property.bedrooms(), property.bathrooms(), property.parkingSpaces(),
+                property.landSizeSqm(),
+                new PropertyAddressResponse(property.address().addressLine(), property.address().suburb(),
+                        property.address().state(), property.address().postcode(), property.address().latitude(),
+                        property.address().longitude()),
+                property.status(), property.version(), property.createdAt(), property.updatedAt(), property.currency());
     }
 }

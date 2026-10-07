@@ -5,6 +5,7 @@ import com.domain.listing.domain.model.IdempotencyConflictException;
 import com.domain.listing.domain.model.PropertyNotFoundException;
 import com.domain.listing.domain.model.PropertyOwnershipException;
 import com.domain.listing.domain.model.StalePropertyVersionException;
+import com.domain.listing.domain.model.MediaStorageUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.UUID;
@@ -13,12 +14,27 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.dao.OptimisticLockingFailureException;
+import jakarta.persistence.OptimisticLockException;
 
 /** Converts domain and validation failures into safe RFC 9457 Problem Details. */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-    /** Maps validation failures to a client-safe bad request response. */
-    @ExceptionHandler({MethodArgumentNotValidException.class, IllegalArgumentException.class})
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    /** Returns a deliberate service-unavailable response when object storage is disabled. */
+    @ExceptionHandler(MediaStorageUnavailableException.class)
+    public ProblemDetail handleMediaUnavailable(
+            final MediaStorageUnavailableException exception, final HttpServletRequest request) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Media storage unavailable", exception.getMessage(), request);
+    }
+
+    /** Maps invalid filters and cursors to a client-safe bad request response. */
+    @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleBadRequest(final Exception exception, final HttpServletRequest request) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid request", exception.getMessage(), request);
     }
@@ -40,19 +56,39 @@ public class GlobalExceptionHandler {
     }
 
     /** Maps stale conditional requests to a precondition-failed response. */
-    @ExceptionHandler(StalePropertyVersionException.class)
+    @ExceptionHandler({StalePropertyVersionException.class,
+            OptimisticLockingFailureException.class, OptimisticLockException.class})
     public ProblemDetail handleStaleVersion(
-            final StalePropertyVersionException exception,
+            final Exception exception,
             final HttpServletRequest request) {
-        return problem(HttpStatus.PRECONDITION_FAILED, "Stale property version", exception.getMessage(), request);
+        return problem(HttpStatus.PRECONDITION_FAILED, "Stale property version",
+                "The listing changed; fetch its current ETag before retrying", request);
     }
 
     /** Maps prohibited lifecycle transitions to a conflict response. */
-    @ExceptionHandler({InvalidPropertyStatusTransitionException.class, IdempotencyConflictException.class})
+    @ExceptionHandler(InvalidPropertyStatusTransitionException.class)
     public ProblemDetail handleInvalidTransition(
             final InvalidPropertyStatusTransitionException exception,
             final HttpServletRequest request) {
         return problem(HttpStatus.CONFLICT, "Invalid property status transition", exception.getMessage(), request);
+    }
+
+    /** Maps changed reuse of an idempotency key to a conflict response. */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ProblemDetail handleIdempotencyConflict(
+            final IdempotencyConflictException exception, final HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Idempotency key conflict", exception.getMessage(), request);
+    }
+
+    /** Normalizes Spring's malformed JSON, header, conversion, and validation failures. */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(
+            final Exception exception, final Object body, final HttpHeaders headers,
+            final HttpStatusCode status, final WebRequest request) {
+        final HttpServletRequest servletRequest = ((ServletWebRequest) request).getRequest();
+        final ProblemDetail detail = problem(HttpStatus.valueOf(status.value()), "Invalid request",
+                "The request body, parameters, or required headers are invalid", servletRequest);
+        return super.handleExceptionInternal(exception, detail, headers, status, request);
     }
 
     private ProblemDetail problem(
@@ -68,7 +104,7 @@ public class GlobalExceptionHandler {
     }
 
     private String traceId(final HttpServletRequest request) {
-        final String requestId = request.getHeader("X-Request-Id");
+        final String requestId = (String) request.getAttribute("requestId");
         return requestId == null || requestId.isBlank() ? UUID.randomUUID().toString() : requestId;
     }
 }

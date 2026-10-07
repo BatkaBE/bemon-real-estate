@@ -1,0 +1,252 @@
+name: bemon-local
+services:
+  identity-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: identity_user
+      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD:?Run scripts/local.sh init first}
+    volumes:
+      - identity-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U identity_user -d identity_db]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  listing-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: listing_db
+      POSTGRES_USER: listing_user
+      POSTGRES_PASSWORD: ${LISTING_DB_PASSWORD:?Run scripts/local.sh init first}
+    volumes:
+      - listing-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U listing_user -d listing_db]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  identity:
+    build:
+      context: ../domain-identity-service
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: identity-db
+      DB_NAME: identity_db
+      DB_USERNAME: identity_user
+      DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      IDENTITY_ISSUER_URI: http://localhost:${BEMON_IDENTITY_PORT:-9000}
+      OAUTH_WEB_CLIENT_SECRET: ${OAUTH_WEB_CLIENT_SECRET:?OAuth secret is required}
+      OAUTH_WEB_CLIENT_ID: ${OAUTH_WEB_CLIENT_ID:-domain-web}
+      OAUTH_WEB_REDIRECT_URI: ${OAUTH_WEB_REDIRECT_URI:-http://localhost:3000/api/auth/callback/domain}
+      DEV_ADMIN_BOOTSTRAP_ENABLED: "true"
+      DEV_ADMIN_EMAIL: ${DEV_ADMIN_EMAIL:?Local administrator email is required}
+      DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:?Local administrator password is required}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Run scripts/local.sh init first}
+      MAIL_ENABLED: "true"
+      SMTP_HOST: mailpit
+      APP_ORIGIN: http://localhost:${BEMON_WEB_PORT:-3000}
+      DEV_SIGNING_KEY_PATH: /data/signing-key.json
+      OAUTH_MOBILE_CLIENT_SECRET: ${OAUTH_MOBILE_CLIENT_SECRET}
+    volumes:
+      - signing-data:/data
+    ports:
+      - 127.0.0.1:${BEMON_IDENTITY_PORT:-9000}:9000
+    depends_on:
+      identity-db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:9000/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+  listing:
+    build:
+      context: ../domain-listing-service
+    environment:
+      DB_HOST: listing-db
+      DB_NAME: listing_db
+      DB_USERNAME: listing_user
+      DB_PASSWORD: ${LISTING_DB_PASSWORD}
+      IDENTITY_ISSUER_URI: http://localhost:${BEMON_IDENTITY_PORT:-9000}
+      IDENTITY_JWK_SET_URI: http://identity:9000/oauth2/jwks
+      MEDIA_ENABLED: "false"
+      IDENTITY_INTERNAL_URL: http://identity:9000
+      REQUEST_BOUNDS_ENABLED: "true"
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      ACCOUNT_REVOCATION_ENABLED: "true"
+      NOTIFICATIONS_ENABLED: "true"
+      SEARCH_INTERNAL_URL: http://search:8000
+      OUTBOX_DELIVERY_ENABLED: "true"
+    ports:
+      - 127.0.0.1:${BEMON_LISTING_PORT:-8080}:8080
+    depends_on:
+      listing-db:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:8080/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+  web:
+    build:
+      context: ../domain-web
+    environment:
+      APP_ORIGIN: http://localhost:${BEMON_WEB_PORT:-3000}
+      IDENTITY_ISSUER_URI: http://localhost:${BEMON_IDENTITY_PORT:-9000}
+      IDENTITY_INTERNAL_URL: http://identity:9000
+      IDENTITY_JWK_SET_URI: http://identity:9000/oauth2/jwks
+      LISTING_INTERNAL_URL: http://listing:8080
+      OAUTH_WEB_CLIENT_ID: ${OAUTH_WEB_CLIENT_ID:-domain-web}
+      OAUTH_WEB_CLIENT_SECRET: ${OAUTH_WEB_CLIENT_SECRET}
+      WEB_SESSION_SECRET: ${WEB_SESSION_SECRET:?Run scripts/local.sh init first}
+      REQUEST_BOUNDS_ENABLED: "true"
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      SEARCH_INTERNAL_URL: http://search:8000
+      PAYMENT_INTERNAL_URL: http://payment:8081
+      OAUTH_MOBILE_CLIENT_SECRET: ${OAUTH_MOBILE_CLIENT_SECRET}
+      MOBILE_WEB_ORIGIN: http://localhost:8082
+    ports:
+      - 127.0.0.1:${BEMON_WEB_PORT:-3000}:3000
+    depends_on:
+      listing:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+  search-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: search_db
+      POSTGRES_USER: search_user
+      POSTGRES_PASSWORD: ${SEARCH_DB_PASSWORD}
+    volumes:
+      - search-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U search_user -d search_db]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  opensearch:
+    image: opensearchproject/opensearch:3.9.0
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - search-index:/usr/share/opensearch/data
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:9200/_cluster/health]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --maxmemory, 64mb, --maxmemory-policy, allkeys-lru]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  search:
+    build:
+      context: ../domain-search-service
+    environment:
+      DATABASE_URL: postgresql://search_user:${SEARCH_DB_PASSWORD}@search-db:5432/search_db
+      OPENSEARCH_URL: http://opensearch:9200
+      REDIS_URL: redis://redis:6379
+      IDENTITY_INTERNAL_URL: http://identity:9000
+      IDENTITY_ISSUER_URI: http://localhost:${BEMON_IDENTITY_PORT:-9000}
+      IDENTITY_JWK_SET_URI: http://identity:9000/oauth2/jwks
+      REQUEST_BOUNDS_ENABLED: "true"
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+    ports:
+      - 127.0.0.1:${BEMON_SEARCH_PORT:-8000}:8000
+    depends_on:
+      search-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, -c, "source rl_env_gpu_clean/bin/activate && python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\",timeout=3)'" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  payment-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
+    volumes:
+      - payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U payment_user -d payment_db]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  payment:
+    build:
+      context: ../domain-payment-service
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: payment-db
+      DB_NAME: payment_db
+      DB_USERNAME: payment_user
+      DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      REQUEST_BOUNDS_ENABLED: "true"
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      IDENTITY_INTERNAL_URL: http://identity:9000
+      LISTING_INTERNAL_URL: http://listing:8080
+      IDENTITY_ISSUER_URI: http://localhost:${BEMON_IDENTITY_PORT:-9000}
+      IDENTITY_JWK_SET_URI: http://identity:9000/oauth2/jwks
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-local-test}
+      FEATURED_PRICE_MNT: ${FEATURED_PRICE_MNT:-20000}
+      SUBSCRIPTION_PRICE_MNT: ${SUBSCRIPTION_PRICE_MNT:-99000}
+      QPAY_CLIENT_ID: ${QPAY_CLIENT_ID:-}
+      QPAY_CLIENT_SECRET: ${QPAY_CLIENT_SECRET:-}
+      QPAY_INVOICE_CODE: ${QPAY_INVOICE_CODE:-}
+      QPAY_API_URL: ${QPAY_API_URL:-https://merchant-sandbox.qpay.mn}
+      QPAY_CALLBACK_ORIGIN: ${QPAY_CALLBACK_ORIGIN:-}
+    ports:
+      - 127.0.0.1:${BEMON_PAYMENT_PORT:-8081}:8081
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      listing:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:8081/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - 127.0.0.1:${BEMON_MAIL_PORT:-8025}:8025
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+volumes:
+  identity-data:
+  listing-data:
+  signing-data:
+  search-data:
+  search-index:
+  payment-data:

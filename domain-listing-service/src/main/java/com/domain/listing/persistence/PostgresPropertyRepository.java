@@ -24,12 +24,20 @@ public class PostgresPropertyRepository implements PropertyRepository {
 
     @Override
     public Property save(final Property property) {
-        return delegate.save(property);
+        return delegate.saveAndFlush(property);
     }
 
     @Override
     public Optional<Property> findById(final UUID propertyId) {
         return delegate.findById(propertyId);
+    }
+
+    /** Retrieves private dashboard data using an explicit owner predicate. */
+    @Override
+    public List<Property> findOwned(final UUID agentId, final PropertyCursor cursor, final int maximumResults) {
+        return delegate.findAll(PropertySpecifications.ownedProperties(agentId, cursor),
+                PageRequest.of(0, maximumResults, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))))
+                .getContent();
     }
 
     @Override

@@ -2,6 +2,8 @@ package com.domain.listing.web;
 
 import com.domain.listing.application.PropertyApplicationService;
 import com.domain.listing.domain.model.Property;
+import com.domain.listing.domain.model.PropertySnapshot;
+import com.domain.listing.domain.model.PriceCurrency;
 import com.domain.listing.domain.model.ListingType;
 import com.domain.listing.domain.model.PropertySearchCriteria;
 import com.domain.listing.domain.model.PropertyType;
@@ -47,10 +49,10 @@ public class PropertyController {
             @AuthenticationPrincipal final Jwt jwt,
             @RequestHeader("Idempotency-Key") final UUID idempotencyKey,
             @Valid @RequestBody final PropertyMutationRequest request) {
-        final Property property = propertyApplicationService.create(
+        final PropertySnapshot property = propertyApplicationService.create(
                 agentId(jwt), idempotencyKey, request.toDraft());
-        return ResponseEntity.created(URI.create("/v1/properties/" + property.getId()))
-                .header(HttpHeaders.ETAG, entityTag(property))
+        return ResponseEntity.created(URI.create("/v1/properties/" + property.id()))
+                .header(HttpHeaders.ETAG, "\"" + property.version() + "\"")
                 .body(PropertyResponse.from(property));
     }
 
@@ -63,19 +65,22 @@ public class PropertyController {
             @RequestParam(required = false) final BigDecimal minPrice,
             @RequestParam(required = false) final BigDecimal maxPrice,
             @RequestParam(required = false) final Integer minBedrooms,
+            @RequestParam(required = false) final PriceCurrency currency,
             @RequestParam(required = false) final String cursor,
             @RequestParam(defaultValue = "20") final int pageSize) {
         return PropertyPageResponse.from(propertyApplicationService.search(
                 new PropertySearchCriteria(
-                        suburb, listingType, propertyType, minPrice, maxPrice, minBedrooms),
+                        suburb, listingType, propertyType, minPrice, maxPrice, minBedrooms, currency),
                 cursor,
                 pageSize));
     }
 
     /** Retrieves one property listing. */
     @GetMapping("/{propertyId}")
-    public ResponseEntity<PropertyResponse> get(@PathVariable final UUID propertyId) {
-        final Property property = propertyApplicationService.get(propertyId);
+    public ResponseEntity<PropertyResponse> get(
+            @PathVariable final UUID propertyId,
+            @AuthenticationPrincipal final Jwt jwt) {
+        final Property property = propertyApplicationService.get(propertyId, jwt == null ? null : agentId(jwt));
         return ResponseEntity.ok().header(HttpHeaders.ETAG, entityTag(property))
                 .body(PropertyResponse.from(property));
     }
@@ -89,7 +94,8 @@ public class PropertyController {
             @RequestHeader(HttpHeaders.IF_MATCH) final String ifMatch,
             @Valid @RequestBody final PropertyMutationRequest request) {
         final Property property = propertyApplicationService.update(
-                agentId(jwt), propertyId, parseEntityTag(ifMatch), request.toDraft());
+                agentId(jwt), propertyId, parseEntityTag(ifMatch),
+                request.toDraft(null));
         return ResponseEntity.ok().header(HttpHeaders.ETAG, entityTag(property))
                 .body(PropertyResponse.from(property));
     }
@@ -118,7 +124,10 @@ public class PropertyController {
 
     private long parseEntityTag(final String entityTag) {
         try {
-            return Long.parseLong(entityTag.replace("\"", ""));
+            if (!entityTag.matches("\"[0-9]+\"")) {
+                throw new IllegalArgumentException("If-Match must contain a quoted numeric entity tag");
+            }
+            return Long.parseLong(entityTag.substring(1, entityTag.length() - 1));
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("If-Match must contain a numeric entity tag");
         }

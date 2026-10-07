@@ -1,0 +1,268 @@
+openapi: 3.1.0
+info:
+  title: Bemon Identity API
+  version: 1.0.0
+  description: |
+    Account APIs use JSON and bearer tokens. Browser login and OAuth2 Authorization Code + PKCE
+    are separate session-based endpoints with CSRF protection. OIDC endpoints are discoverable
+    through /.well-known/openid-configuration.
+servers:
+  - url: http://localhost:9000
+paths:
+  /v1/users/register:
+    post:
+      operationId: registerBuyer
+      summary: Register a buyer account; roles cannot be selected by the caller
+      requestBody:
+        $ref: '#/components/requestBodies/Registration'
+      responses:
+        '201':
+          $ref: '#/components/responses/UserCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/EmailConflict'
+  /v1/admin/users/agents:
+    post:
+      operationId: provisionAgent
+      summary: Provision an agent account; requires ROLE_AGENCY_ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/Registration'
+      responses:
+        '201':
+          $ref: '#/components/responses/UserCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/EmailConflict'
+  /v1/users/me:
+    get:
+      operationId: getMyProfile
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Current enabled account; no password or credentials.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Profile'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      operationId: updateMyContact
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName, phone]
+              properties:
+                displayName: {type: string, maxLength: 120}
+                phone: {type: string, maxLength: 30, pattern: '^[+0-9 ()-]*$'}
+      responses:
+        '200':
+          description: Updated profile; email and role remain server-owned.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Profile'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /v1/users/me/verification:
+    post:
+      operationId: requestMyEmailVerification
+      security: [{bearerAuth: []}]
+      summary: Queue one-time verification for the authenticated email; earlier links are invalidated
+      responses:
+        '200': {$ref: '#/components/responses/Accepted'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /v1/accounts/forgot-password:
+    post:
+      operationId: requestPasswordRecovery
+      summary: Uniform response whether or not an enabled account exists
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, format: email, maxLength: 320}
+      responses:
+        '200': {$ref: '#/components/responses/Accepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /v1/accounts/verify-email:
+    post:
+      operationId: consumeEmailVerification
+      summary: Consume a single-use verification link, valid for 24 hours
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Challenge'}
+      responses:
+        '200': {$ref: '#/components/responses/Accepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /v1/accounts/reset-password:
+    post:
+      operationId: consumePasswordRecovery
+      summary: Consume a 30-minute single-use challenge and revoke all existing credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, maxLength: 128, writeOnly: true}
+                password: {type: string, minLength: 12, maxLength: 72, writeOnly: true}
+      responses:
+        '200': {$ref: '#/components/responses/Accepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /v1/agents/{id}/contact:
+    parameters:
+      - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: getPublicAgentContact
+      responses:
+        '200':
+          description: Optional id, displayName and phone of an enabled agent; otherwise an empty object. No email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string, format: uuid}
+                  displayName: {type: string}
+                  phone: {type: string}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Signed access token with scope, trusted web/mobile audience and current account epoch. ID tokens are rejected.
+  requestBodies:
+    Registration:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Registration'
+  responses:
+    Accepted:
+      description: Fixed acknowledgement; recovery and verification credentials are never returned.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message: {type: string}
+    UserCreated:
+      description: The account was created; no password or hash is returned.
+      headers:
+        Location:
+          description: Identifier URI of the created account; a user-detail endpoint is not yet implemented.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+    BadRequest:
+      description: Invalid email, password policy, or JSON request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    EmailConflict:
+      description: This email is already registered; comparison ignores case.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Unauthorized:
+      description: A valid bearer access token is required.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Forbidden:
+      description: Agency administrator privileges are required.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+  schemas:
+    Profile:
+      type: object
+      required: [id, email, role, displayName, phone, emailVerified, authVersion]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        role: {type: string, enum: [ROLE_BUYER, ROLE_AGENT, ROLE_AGENCY_ADMIN], readOnly: true}
+        displayName: {type: string, maxLength: 120}
+        phone: {type: string, maxLength: 30}
+        emailVerified: {type: boolean, readOnly: true}
+        authVersion: {type: integer, minimum: 0, readOnly: true}
+    Challenge:
+      type: object
+      required: [token]
+      properties:
+        token: {type: string, maxLength: 128, writeOnly: true}
+    Registration:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 12
+          maxLength: 72
+          writeOnly: true
+          description: At most 72 UTF-8 bytes; must include uppercase, lowercase, digit, and symbol.
+    User:
+      type: object
+      required: [id, email, role, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [ROLE_BUYER, ROLE_AGENT, ROLE_AGENCY_ADMIN]
+        createdAt:
+          type: string
+          format: date-time
+    ProblemDetail:
+      type: object
+      required: [type, title, status, detail, instance, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        traceId:
+          type: string

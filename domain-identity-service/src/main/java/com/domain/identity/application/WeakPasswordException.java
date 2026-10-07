@@ -4,6 +4,7 @@ package com.domain.identity.application;
 public class WeakPasswordException extends RuntimeException {
     /** Creates a generic password-policy exception. */
     public WeakPasswordException() {
-        super("Password must contain 12 to 72 characters, uppercase, lowercase, digit, and symbol");
+        super("Password must contain at least 12 characters, fit in 72 UTF-8 bytes, "
+                + "and include uppercase, lowercase, digit, and symbol");
     }
 }

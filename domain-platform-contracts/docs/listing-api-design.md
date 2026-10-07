@@ -12,3 +12,7 @@ This contract applies the backend mastery guide before implementation.
 | Module 4.3–4.5 | `property.updated.v1` event and transactional outbox | Search consumes an independent, eventually consistent read model. |
 
 The Listing Service is the only writer for listings. Search, notifications, and recommendations consume events or public APIs; they never query the Listing database directly.
+
+New creates default to MNT. Clients should send `currency` explicitly, and public discovery should specify it whenever price filters are used. Existing Australian data is labelled AUD by V5 without conversion; replacement requests omitting currency retain the previous label. Fingerprints include currency and historical snapshots preserve their original denomination.
+
+`GET /v1/agents/me/properties` derives ownership from the JWT subject, requires agent/write authorities, and includes private statuses. The public browse endpoint returns only ACTIVE listings. Web cookie adapters enforce same-origin mutations; backend APIs retain bearer-only authorization.

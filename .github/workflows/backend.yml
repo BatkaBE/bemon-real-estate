@@ -1,0 +1,114 @@
+name: Platform checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Unit, HTTP, PostgreSQL and OAuth integration checks
+        run: mvn -B verify -Pintegration
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-jars
+          path: |
+            domain-identity-service/target/identity-service-0.1.0-SNAPSHOT.jar
+            domain-listing-service/target/listing-service-0.1.0-SNAPSHOT.jar
+            domain-payment-service/target/payment-service-0.1.0-SNAPSHOT.jar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-reports
+          path: |
+            domain-*/target/surefire-reports/
+            domain-*/target/failsafe-reports/
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: domain-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: domain-web/package-lock.json
+      - run: npm ci --no-fund --no-audit
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  browser:
+    needs: [verify, web, mobile]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: domain-web/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-jars
+          path: .
+      - run: npm ci --no-fund --no-audit
+        working-directory: domain-web
+      - run: npx playwright install --with-deps chromium
+        working-directory: domain-web
+      - run: bash scripts/local.sh up
+      - uses: actions/download-artifact@v4
+        with:
+          name: mobile-export
+          path: domain-mobile/dist
+      - run: node scripts/mobile-preview.mjs > /tmp/mobile-preview.log 2>&1 &
+      - run: bash scripts/local.sh seed
+      - run: bash scripts/local.sh smoke
+      - name: Search PostgreSQL/OpenSearch integration in activated Conda
+        run: docker compose --env-file .local.env -f domain-platform-infra/compose.local.yaml run --rm --no-deps search bash -c 'source rl_env_gpu_clean/bin/activate && python -m pytest -q -p no:cacheprovider tests'
+      - run: npm run test:e2e
+        working-directory: domain-web
+      - run: bash scripts/backup-restore-local.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-browser-reports
+          path: |
+            domain-web/playwright-report/
+            domain-web/test-results/
+      - run: bash scripts/local.sh stop
+        if: always()
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: domain-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: domain-mobile/package-lock.json
+      - run: npm ci --no-fund --no-audit
+      - run: npm run typecheck
+      - run: npm test
+      - run: EXPO_OFFLINE=1 npm run export
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-export
+          path: domain-mobile/dist

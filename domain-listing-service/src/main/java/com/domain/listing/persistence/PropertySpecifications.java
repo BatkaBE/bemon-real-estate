@@ -29,6 +29,16 @@ final class PropertySpecifications {
         };
     }
 
+    /** Selects only the authenticated agent's listings, including private states. */
+    static Specification<Property> ownedProperties(final UUID agentId, final PropertyCursor cursor) {
+        return (root, query, builder) -> {
+            final List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.equal(root.get("agentId"), agentId));
+            addCursor(cursor, root, builder, predicates);
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
     private static void addFilters(
             final PropertySearchCriteria criteria,
             final jakarta.persistence.criteria.Root<Property> root,
@@ -51,6 +61,9 @@ final class PropertySpecifications {
         }
         if (criteria.minBedrooms() != null) {
             predicates.add(builder.greaterThanOrEqualTo(root.get("bedrooms"), criteria.minBedrooms()));
+        }
+        if (criteria.currency() != null) {
+            predicates.add(builder.equal(root.get("currency"), criteria.currency()));
         }
     }
 

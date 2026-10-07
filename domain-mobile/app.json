@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name":"Bemon","slug":"bemon","scheme":"bemon","version":"0.1.0","orientation":"portrait","userInterfaceStyle":"light",
+    "platforms":["android","ios","web"],
+    "ios":{"bundleIdentifier":"mn.bemon.app","supportsTablet":true,"infoPlist":{"NSAppTransportSecurity":{"NSAllowsLocalNetworking":true}}},
+    "android":{"package":"mn.bemon.app","versionCode":1},
+    "plugins":["expo-secure-store"],
+    "web":{"bundler":"metro","output":"single"}
+  }
+}

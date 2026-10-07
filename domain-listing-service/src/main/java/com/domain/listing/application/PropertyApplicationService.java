@@ -10,6 +10,7 @@ import com.domain.listing.domain.model.PropertyNotFoundException;
 import com.domain.listing.domain.model.PropertyOwnershipException;
 import com.domain.listing.domain.model.PropertyStatus;
 import com.domain.listing.domain.model.PropertySearchCriteria;
+import com.domain.listing.domain.model.PropertySnapshot;
 import com.domain.listing.domain.model.StalePropertyVersionException;
 import com.domain.listing.domain.port.PropertyRepository;
 import com.domain.listing.domain.port.MediaStorage;
@@ -18,6 +19,8 @@ import com.domain.listing.domain.model.PropertyMedia;
 import com.domain.listing.media.config.MediaProperties;
 import com.domain.listing.persistence.IdempotencyRecord;
 import com.domain.listing.persistence.JpaIdempotencyRecordRepository;
+import com.domain.listing.persistence.IdempotencyLock;
+import com.domain.listing.persistence.PropertyOutbox;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +45,8 @@ public class PropertyApplicationService {
     private final MediaStorage mediaStorage;
     private final MediaProperties mediaProperties;
     private final Clock clock;
+    private final IdempotencyLock idempotencyLock;
+    private final PropertyOutbox outbox;
 
     /** Creates the service with domain-owned ports and time source. */
     public PropertyApplicationService(
@@ -50,44 +55,65 @@ public class PropertyApplicationService {
             final PropertyMediaRepository propertyMediaRepository,
             final MediaStorage mediaStorage,
             final MediaProperties mediaProperties,
-            final Clock clock) {
+            final Clock clock,
+            final IdempotencyLock idempotencyLock,
+            final PropertyOutbox outbox) {
         this.propertyRepository = propertyRepository;
         this.idempotencyRecordRepository = idempotencyRecordRepository;
         this.propertyMediaRepository = propertyMediaRepository;
         this.mediaStorage = mediaStorage;
         this.mediaProperties = mediaProperties;
         this.clock = clock;
+        this.idempotencyLock = idempotencyLock;
+        this.outbox = outbox;
     }
 
     /** Creates a draft property owned by the authenticated agent. */
     @Transactional
-    public Property create(final UUID agentId, final UUID idempotencyKey, final PropertyDraft draft) {
+    public PropertySnapshot create(final UUID agentId, final UUID idempotencyKey, final PropertyDraft draft) {
+        idempotencyLock.acquire(idempotencyKey);
         final String requestHash = RequestFingerprint.forDraft(draft);
+        final Instant createdAt = Instant.now(clock);
         final var existing = idempotencyRecordRepository.findById(idempotencyKey);
-        if (existing.isPresent()) {
+        if (existing.isPresent() && !existing.get().isExpired(createdAt)) {
             final IdempotencyRecord record = existing.get();
-            if (!record.matches(agentId, requestHash)) {
+            final boolean legacyMatch = record.getResponseBody() == null
+                    && record.matches(agentId, RequestFingerprint.forLegacyDraft(draft))
+                    && find(record.getPropertyId()).getCurrency() == draft.currency();
+            final boolean previousMatch = record.matches(agentId, RequestFingerprint.forPreviousDraft(draft))
+                    && (record.getResponseBody() == null ? find(record.getPropertyId()).getCurrency()
+                        : record.getResponseBody().currency()) == draft.currency();
+            if (!record.matches(agentId, requestHash) && !legacyMatch && !previousMatch) {
                 throw new IdempotencyConflictException();
             }
-            return find(record.getPropertyId());
+            // Legacy records predate retained response bodies; new records always store a snapshot.
+            return record.getResponseBody() == null
+                    ? PropertySnapshot.from(find(record.getPropertyId())) : record.getResponseBody();
         }
 
         final Property property = propertyRepository.save(Property.create(agentId, draft, clock));
-        final Instant createdAt = Instant.now(clock);
+        final PropertySnapshot response = PropertySnapshot.from(property);
         idempotencyRecordRepository.save(new IdempotencyRecord(
                 idempotencyKey,
                 agentId,
                 requestHash,
                 property.getId(),
                 createdAt,
-                createdAt.plus(Duration.ofHours(24))));
-        return property;
+                createdAt.plus(Duration.ofHours(24)),
+                response));
+        outbox.append(property);
+        return response;
     }
 
     /** Returns one listing or signals that it does not exist. */
     @Transactional(readOnly = true)
-    public Property get(final UUID propertyId) {
-        return find(propertyId);
+    public Property get(final UUID propertyId, final UUID viewerId) {
+        final Property property = find(propertyId);
+        if ((property.getStatus() == PropertyStatus.DRAFT || property.getStatus() == PropertyStatus.WITHDRAWN)
+                && !property.isOwnedBy(viewerId)) {
+            throw new PropertyNotFoundException(propertyId);
+        }
+        return property;
     }
 
     /** Returns a stable keyset-paginated page of publicly discoverable listings. */
@@ -99,6 +125,21 @@ public class PropertyApplicationService {
         validateSearch(criteria, pageSize);
         final PropertyCursor cursor = cursorValue == null ? null : CursorCodec.decode(cursorValue);
         final List<Property> candidates = propertyRepository.findActive(criteria, cursor, pageSize + 1);
+        return page(candidates, pageSize);
+    }
+
+    /** Returns the authenticated agent's public and private listings for the dashboard. */
+    @Transactional(readOnly = true)
+    public PropertySearchPage searchOwned(final UUID agentId, final String cursorValue, final int pageSize) {
+        if (pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("pageSize must be between 1 and 100");
+        }
+        final PropertyCursor cursor = cursorValue == null ? null : CursorCodec.decode(cursorValue);
+        return page(propertyRepository.findOwned(agentId, cursor, pageSize + 1), pageSize);
+    }
+
+    /** Builds the shared keyset response after fetching one extra row. */
+    private PropertySearchPage page(final List<Property> candidates, final int pageSize) {
         final boolean hasMore = candidates.size() > pageSize;
         final List<Property> items = List.copyOf(candidates.subList(0, Math.min(candidates.size(), pageSize)));
         final String nextCursor = hasMore
@@ -137,8 +178,10 @@ public class PropertyApplicationService {
             final long expectedVersion,
             final PropertyDraft draft) {
         final Property property = ownedCurrentVersion(agentId, propertyId, expectedVersion);
-        property.replace(draft, clock);
-        return propertyRepository.save(property);
+        property.replace(draft.withDefaultCurrency(property.getCurrency()), clock);
+        final Property saved = propertyRepository.save(property);
+        outbox.append(saved);
+        return saved;
     }
 
     /** Performs a permitted lifecycle transition after ownership and version checks. */
@@ -149,8 +192,10 @@ public class PropertyApplicationService {
             final long expectedVersion,
             final PropertyStatus status) {
         final Property property = ownedCurrentVersion(agentId, propertyId, expectedVersion);
-        property.transitionTo(status);
-        return propertyRepository.save(property);
+        property.transitionTo(status, clock);
+        final Property saved = propertyRepository.save(property);
+        outbox.append(saved);
+        return saved;
     }
 
     private Property ownedCurrentVersion(
@@ -185,6 +230,16 @@ public class PropertyApplicationService {
     private void validateSearch(final PropertySearchCriteria criteria, final int pageSize) {
         if (pageSize < 1 || pageSize > 100) {
             throw new IllegalArgumentException("pageSize must be between 1 and 100");
+        }
+        if (criteria.suburb() != null && (criteria.suburb().isBlank() || criteria.suburb().length() > 100)) {
+            throw new IllegalArgumentException("suburb must contain 1 to 100 characters");
+        }
+        if ((criteria.minPrice() != null && criteria.minPrice().signum() < 0)
+                || (criteria.maxPrice() != null && criteria.maxPrice().signum() < 0)) {
+            throw new IllegalArgumentException("Price filters must be non-negative");
+        }
+        if (criteria.minBedrooms() != null && (criteria.minBedrooms() < 0 || criteria.minBedrooms() > 50)) {
+            throw new IllegalArgumentException("minBedrooms must be between 0 and 50");
         }
         if (criteria.minPrice() != null && criteria.maxPrice() != null
                 && criteria.minPrice().compareTo(criteria.maxPrice()) > 0) {

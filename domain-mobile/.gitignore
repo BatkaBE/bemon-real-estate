@@ -1,6 +1,7 @@
 node_modules/
 .expo/
-android/.gradle/
-ios/Pods/
-.env*
-*.log
+dist/
+.env
+.env.local
+android/
+ios/

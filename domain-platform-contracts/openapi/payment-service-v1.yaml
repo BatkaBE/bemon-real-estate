@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info: {title: Bemon Payment, version: 0.1.0}
+servers: [{url: 'http://localhost:8081'}]
+security: [{bearer: []}]
+paths:
+  /v1/payments/offers:
+    get:
+      security: []
+      responses: {'200': {description: Configured provider and server-selected MNT products}, '503': {description: Provider is not configured}}
+  /v1/payments/orders:
+    post:
+      summary: Agent purchase with immutable server price and a once-only provider write
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string, format: uuid}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offer]
+              properties:
+                offer: {type: string, enum: [FEATURED7, AGENT30]}
+                propertyId: {type: string, format: uuid, description: Required for FEATURED7; absent for AGENT30}
+      responses: {'200': {description: 'Original order including durable PENDING or CREATE_UNKNOWN state'}, '403': {description: Agent required}, '409': {description: Changed retry or invalid property ownership/status}}
+  /v1/payments/orders/{id}:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    get:
+      responses: {'200': {description: Caller-owned order and invoice QR/deeplinks}, '404': {description: Order unavailable}}
+  /v1/payments/orders/{id}/check:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Reconcile provider evidence after callback; never scheduled polling
+      responses: {'200': {description: Unchanged pending or once-only paid order}, '409': {description: Missing callback or invalid evidence/state}}
+  /v1/payments/orders/{id}/cancel:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    post:
+      responses: {'200': {description: Cancelled or durable CANCEL_UNKNOWN}, '409': {description: Non-pending state}}
+  /v1/payments/credits:
+    post:
+      parameters: [{in: header, name: Idempotency-Key, required: true, schema: {type: string, format: uuid}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [propertyId], properties: {propertyId: {type: string, format: uuid}}}}}
+      responses: {'200': {description: Once-only subscription credit consumption and durable feature grant}, '409': {description: No credit or invalid target/retry}}
+  /v1/users/me/payments:
+    get:
+      responses: {'200': {description: Caller history and unexpired subscription credits}}
+  /v1/admin/payments/{id}/simulate:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: ROLE_AGENCY_ADMIN and dev-only LOCAL_TEST settlement
+      responses: {'200': {description: Explicit test payment}, '403': {description: Administrator required}}
+  /v1/admin/payments:
+    get:
+      summary: ROLE_AGENCY_ADMIN bounded reconciliation history, including unresolved states
+      responses: {'200': {description: Recent orders needing support review}, '403': {description: Administrator required}}
+  /v1/admin/payments/{id}:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: ROLE_AGENCY_ADMIN order evidence; no provider credentials or callback secret
+      responses: {'200': {description: Order evidence and state}, '403': {description: Administrator required}, '404': {description: Order unavailable}}
+  /v1/admin/payments/{id}/refund:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    post:
+      responses: {'200': {description: Provider-confirmed reversal or REFUND_UNKNOWN}, '409': {description: Consumed plan or invalid state}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, bearerFormat: JWT}

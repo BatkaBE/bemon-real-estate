@@ -1,0 +1,6 @@
+.local.env
+.local.env.tmp.*
+*.log
+**/target/
+.idea/
+.vscode/

@@ -11,6 +11,7 @@ import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
@@ -55,6 +57,13 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.http.MediaType;
+import com.domain.identity.web.error.ApiSecurityErrors;
+import com.domain.identity.application.AccountService;
 
 /** Security configuration for OAuth2 Authorization Code with PKCE and OIDC endpoints. */
 @Configuration
@@ -66,22 +75,57 @@ public class AuthorizationServerConfiguration {
     public SecurityFilterChain authorizationServerSecurityFilterChain(final HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).oidc(Customizer.withDefaults());
-        return http.oauth2ResourceServer(oauth2 -> oauth2.jwt(
+        return http.exceptionHandling(exceptions -> exceptions.defaultAuthenticationEntryPointFor(
+                        new LoginUrlAuthenticationEntryPoint("/login"),
+                        new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                 jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))).build();
+    }
+
+    /** Keeps bearer-only account APIs independent of interactive login sessions and CSRF tokens. */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain apiSecurityFilterChain(final HttpSecurity http,
+            final ApiSecurityErrors errors, final JwtDecoder decoder,
+            @Value("${app.oauth.issuer}") final String issuer,
+            @Value("${app.oauth.web-client-id}") final String webClientId) throws Exception {
+        return http.securityMatcher("/v1/**", "/internal/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/v1/users/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/accounts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/agents/*/contact").permitAll()
+                        .requestMatchers("/internal/**").permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(errors).accessDeniedHandler(errors))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(errors).accessDeniedHandler(errors)
+                        .jwt(jwt -> jwt.decoder(token -> {
+                            final var credential = decoder.decode(token);
+                            // ID tokens share the client audience but have no access-token scope claim.
+                            // Keep this restriction on API authentication so OIDC logout can validate ID tokens.
+                            if (!credential.hasClaim("scope")
+                                    || !issuer.equals(credential.getClaimAsString("iss"))
+                                    || credential.getAudience().stream().noneMatch(audience ->
+                                            audience.equals(webClientId) || audience.equals("domain-mobile"))) {
+                                throw new BadJwtException("An application access token is required");
+                            }
+                            return credential;
+                        }).jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .build();
     }
 
     /** Configures interactive login for the authorization endpoint. */
     @Bean
-    @Order(2)
+    @Order(3)
     public SecurityFilterChain applicationSecurityFilterChain(final HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/users/register").permitAll()
                         .anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(
-                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .formLogin(form -> form.loginPage("/login").permitAll())
                 .build();
     }
 
@@ -135,10 +179,28 @@ public class AuthorizationServerConfiguration {
             @Value("${app.oauth.web-client-secret}") final String clientSecret,
             @Value("${app.oauth.web-redirect-uri}") final String redirectUri) {
         return ignored -> {
-            if (clients.findByClientId(clientId) == null) {
+            final RegisteredClient existing = clients.findByClientId(clientId);
+            if (existing == null) {
                 clients.save(buildWebClient(clientId, clientSecret, redirectUri, passwordEncoder));
+            } else {
+                // Add logout redirects from already trusted callback origins without rotating credentials.
+                final var logoutUris = existing.getRedirectUris().stream()
+                        .map(uri -> URI.create(uri).resolve("/login").toString()).toList();
+                if (!existing.getPostLogoutRedirectUris().containsAll(logoutUris)) {
+                    clients.save(RegisteredClient.from(existing)
+                            .postLogoutRedirectUris(uris -> uris.addAll(logoutUris)).build());
+                }
             }
         };
+    }
+
+    /** Registers a confidential mobile BFF client; no client secret is shipped to the native app. */
+    @Bean
+    public CommandLineRunner initializeMobileClient(final RegisteredClientRepository clients,final PasswordEncoder encoder,@Value("${OAUTH_MOBILE_CLIENT_SECRET:}") final String secret) {
+        return ignored->{if(!secret.isBlank()&&clients.findByClientId("domain-mobile")==null)clients.save(RegisteredClient.withId(UUID.randomUUID().toString()).clientId("domain-mobile").clientSecret(encoder.encode(secret))
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+            .redirectUri("bemon://oauth").redirectUri("http://localhost:8082/oauth").scope(OidcScopes.OPENID).scope(OidcScopes.PROFILE)
+            .clientSettings(ClientSettings.builder().requireProofKey(true).build()).tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(15)).refreshTokenTimeToLive(Duration.ofDays(30)).reuseRefreshTokens(false).build()).build());};
     }
 
     private RegisteredClient buildWebClient(
@@ -153,6 +215,7 @@ public class AuthorizationServerConfiguration {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(redirectUri)
+                .postLogoutRedirectUri(URI.create(redirectUri).resolve("/login").toString())
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope("listings:write")
@@ -165,10 +228,20 @@ public class AuthorizationServerConfiguration {
                 .build();
     }
 
-    /** Generates an ephemeral RSA signing key for the development profile only. */
+    /** Retains the development signing key across restarts when a private persistent path is configured. */
     @Bean
     @Profile("dev")
-    public JWKSource<SecurityContext> jwkSource() {
+    public JWKSource<SecurityContext> jwkSource(@Value("${DEV_SIGNING_KEY_PATH:}") final String path) throws Exception {
+        if (!path.isBlank()) {
+            final var file = java.nio.file.Path.of(path);
+            if (java.nio.file.Files.exists(file)) return new ImmutableJWKSet<>(new JWKSet(RSAKey.parse(java.nio.file.Files.readString(file))));
+            java.nio.file.Files.createDirectories(file.toAbsolutePath().getParent());
+            final KeyPair generated = generateRsaKey();
+            final RSAKey key = new RSAKey.Builder((RSAPublicKey) generated.getPublic()).privateKey((RSAPrivateKey) generated.getPrivate()).keyID(UUID.randomUUID().toString()).build();
+            java.nio.file.Files.writeString(file, key.toJSONString(), java.nio.file.StandardOpenOption.CREATE_NEW);
+            java.nio.file.Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            return new ImmutableJWKSet<>(new JWKSet(key));
+        }
         final KeyPair keyPair = generateRsaKey();
         final RSAKey rsaKey = new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
                 .privateKey((RSAPrivateKey) keyPair.getPrivate())
@@ -179,8 +252,17 @@ public class AuthorizationServerConfiguration {
 
     /** Provides JWT decoding for OIDC UserInfo and resource-server support. */
     @Bean
-    public JwtDecoder jwtDecoder(final JWKSource<SecurityContext> jwkSource) {
-        return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+    public JwtDecoder jwtDecoder(final JWKSource<SecurityContext> jwkSource, final AccountService accounts) {
+        final JwtDecoder delegate = OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+        return value -> {
+            final Jwt jwt = delegate.decode(value);
+            final String epoch = jwt.getClaimAsString("auth_version");
+            try {
+                if (accounts.authVersion(UUID.fromString(jwt.getSubject())) != (epoch == null ? 0 : Long.parseLong(epoch)))
+                    throw new org.springframework.security.oauth2.jwt.JwtException("Revoked account credentials");
+            } catch (IllegalArgumentException error) { throw new org.springframework.security.oauth2.jwt.JwtException("Invalid account", error); }
+            return jwt;
+        };
     }
 
     /** Publishes issuer and endpoint metadata. */
@@ -192,10 +274,15 @@ public class AuthorizationServerConfiguration {
 
     /** Adds application roles to access-token claims while standard scopes remain in the `scope` claim. */
     @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer() {
-        return context -> context.getClaims().claim("roles", context.getPrincipal().getAuthorities().stream()
+    public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(final AccountService accounts) {
+        return context -> {
+            // String claims survive Security's restrictive JDBC authorization JSON allowlist.
+            context.getClaims().claim("auth_version", Long.toString(accounts.authVersion(UUID.fromString(context.getPrincipal().getName()))));
+            context.getClaims().claim("roles", context.getPrincipal().getAuthorities().stream()
                 .map(authority -> authority.getAuthority())
-                .toList());
+                // ArrayList is supported by Spring Security's JDBC deserialization allowlist.
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
+        };
     }
 
     /** Maps standard scopes and the custom JWT `roles` claim into Spring authorities. */

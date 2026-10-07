@@ -14,6 +14,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Transactional aggregate for a property listing. Search projections are maintained outside this model.
@@ -43,9 +45,16 @@ public class Property {
     @Column(precision = 12, scale = 2)
     private BigDecimal price;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 3)
+    private PriceCurrency currency;
+
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     private Integer bedrooms;
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     private Integer bathrooms;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "parking_spaces")
     private Integer parkingSpaces;
 
@@ -112,11 +121,12 @@ public class Property {
      *
      * @param target the requested status
      */
-    public void transitionTo(final PropertyStatus target) {
+    public void transitionTo(final PropertyStatus target, final Clock clock) {
         if (!status.canTransitionTo(target)) {
             throw new InvalidPropertyStatusTransitionException(status, target);
         }
         status = target;
+        updatedAt = Instant.now(clock);
     }
 
     /** Checks whether the supplied agent owns this aggregate. */
@@ -130,6 +140,8 @@ public class Property {
     public PropertyType getPropertyType() { return propertyType; }
     public ListingType getListingType() { return listingType; }
     public BigDecimal getPrice() { return price; }
+    /** Returns the original denomination of this listing's price. */
+    public PriceCurrency getCurrency() { return currency; }
     public Integer getBedrooms() { return bedrooms; }
     public Integer getBathrooms() { return bathrooms; }
     public Integer getParkingSpaces() { return parkingSpaces; }
@@ -150,6 +162,7 @@ public class Property {
         propertyType = draft.propertyType();
         listingType = draft.listingType();
         price = draft.price();
+        currency = Objects.requireNonNull(draft.currency(), "currency must not be null");
         bedrooms = draft.bedrooms();
         bathrooms = draft.bathrooms();
         parkingSpaces = draft.parkingSpaces();

@@ -1,5 +1,7 @@
 server:
-  port: 9000
+  tomcat:
+    max-http-form-post-size: 64KB
+  port: ${SERVER_PORT:9000}
 spring:
   application:
     name: identity-service
@@ -13,12 +15,46 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  session:
+    jdbc:
+      initialize-schema: never
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 3000
+      mail.smtp.writetimeout: 3000
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+logging:
+  level:
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId}] %logger{36} - %msg%n"
 app:
+  bounds:
+    enabled: ${REQUEST_BOUNDS_ENABLED:false}
+  web-origin: ${APP_ORIGIN:http://localhost:3000}
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${SMTP_FROM:no-reply@bemon.local}
+  bootstrap:
+    enabled: ${DEV_ADMIN_BOOTSTRAP_ENABLED:false}
+    email: ${DEV_ADMIN_EMAIL:}
+    password: ${DEV_ADMIN_PASSWORD:}
   oauth:
     issuer: ${IDENTITY_ISSUER_URI:http://localhost:9000}
     web-client-id: ${OAUTH_WEB_CLIENT_ID:domain-web}

@@ -39,6 +39,19 @@ public class UserRegistrationService {
         return register(email, rawPassword, AccountRole.ROLE_AGENT);
     }
 
+    /** Creates a first administrator for an explicitly enabled local bootstrap; never changes existing roles. */
+    @Transactional
+    public PlatformUser bootstrapAdministrator(final String email, final String rawPassword) {
+        final var existing = users.findByEmailIgnoreCase(normalizeEmail(email));
+        if (existing.isPresent()) {
+            if (existing.get().getRole() != AccountRole.ROLE_AGENCY_ADMIN) {
+                throw new IllegalStateException("Bootstrap email is already assigned to a non-admin account");
+            }
+            return existing.get();
+        }
+        return register(email, rawPassword, AccountRole.ROLE_AGENCY_ADMIN);
+    }
+
     private PlatformUser register(final String email, final String rawPassword, final AccountRole role) {
         final String normalizedEmail = normalizeEmail(email);
         PasswordPolicy.validate(rawPassword);

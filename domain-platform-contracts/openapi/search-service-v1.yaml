@@ -1,0 +1,60 @@
+openapi: 3.0.3
+info: {title: Bemon Search, version: 0.1.0}
+servers: [{url: 'http://localhost:8001'}]
+paths:
+  /v1/search:
+    get:
+      summary: Active listings with full text, filters, facets, radius and query-bound pagination
+      parameters:
+        - {in: query, name: q, schema: {type: string, maxLength: 120}}
+        - {in: query, name: suburb, schema: {type: string, maxLength: 100}}
+        - {in: query, name: currency, schema: {type: string, enum: [MNT, AUD], default: MNT}}
+        - {in: query, name: listingType, schema: {type: string, enum: [SALE, RENT]}}
+        - {in: query, name: propertyType, schema: {type: string, enum: [HOUSE, APARTMENT, TOWNHOUSE, LAND, UNIT]}}
+        - {in: query, name: minPrice, schema: {type: number, minimum: 0}}
+        - {in: query, name: maxPrice, schema: {type: number, minimum: 0}}
+        - {in: query, name: minBedrooms, schema: {type: integer, minimum: 0}}
+        - {in: query, name: latitude, schema: {type: number, minimum: -90, maximum: 90}}
+        - {in: query, name: longitude, schema: {type: number, minimum: -180, maximum: 180}}
+        - {in: query, name: radiusKm, schema: {type: number, minimum: 0, maximum: 200}}
+        - {in: query, name: cursor, schema: {type: string, maxLength: 1024}}
+      responses:
+        '200': {description: '20 active results, nextCursor, total, facet buckets'}
+        '400': {description: Invalid or criteria-mismatched cursor}
+        '422': {description: Invalid filter or incomplete coordinates}
+        '503': {description: Search dependency unavailable}
+  /v1/users/me/searches:
+    get:
+      security: [{bearer: []}]
+      responses: {'200': {description: Up to50 caller-owned saved searches}}
+    post:
+      security: [{bearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, criteria]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 120}
+                criteria: {type: object, description: 'Same bounded search filters, no cursor'}
+                emailEnabled: {type: boolean, default: false}
+      responses: {'201': {description: Saved-search UUID}, '409': {description: Per-account limit50}}
+  /v1/users/me/searches/{id}:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    delete:
+      security: [{bearer: []}]
+      responses: {'200': {description: Idempotent caller-owned deletion}}
+  /v1/users/me/alerts:
+    get:
+      security: [{bearer: []}]
+      responses: {'200': {description: Up to50 caller-owned matching-listing alerts}}
+  /v1/users/me/alerts/{id}/read:
+    parameters: [{in: path, name: id, required: true, schema: {type: string, format: uuid}}]
+    post:
+      security: [{bearer: []}]
+      responses: {'200': {description: Idempotent caller-owned read state}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, bearerFormat: JWT}

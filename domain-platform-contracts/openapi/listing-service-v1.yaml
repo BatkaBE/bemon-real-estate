@@ -10,6 +10,29 @@ servers:
 tags:
   - name: Properties
 paths:
+  /agents/me/properties:
+    get:
+      tags: [Properties]
+      summary: Browse all statuses of listings owned by the authenticated agent
+      operationId: listOwnProperties
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A cursor-paginated page scoped to the JWT subject; includes private drafts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /properties:
     post:
       tags: [Properties]
@@ -39,6 +62,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
     get:
@@ -49,6 +74,7 @@ paths:
         - $ref: '#/components/parameters/Suburb'
         - $ref: '#/components/parameters/ListingType'
         - $ref: '#/components/parameters/PropertyType'
+        - $ref: '#/components/parameters/Currency'
         - $ref: '#/components/parameters/MinPrice'
         - $ref: '#/components/parameters/MaxPrice'
         - $ref: '#/components/parameters/MinBedrooms'
@@ -66,8 +92,11 @@ paths:
   /properties/{propertyId}:
     get:
       tags: [Properties]
-      summary: Get one property listing
+      summary: Get a published listing, or an unpublished listing owned by the caller
       operationId: getProperty
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/PropertyId'
       responses:
@@ -185,6 +214,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     bearerAuth:
@@ -192,6 +223,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    Currency:
+      name: currency
+      in: query
+      description: Filters currency without conversion. Always specify with price filters across markets.
+      schema:
+        $ref: '#/components/schemas/PriceCurrency'
     PropertyId:
       name: propertyId
       in: path
@@ -214,6 +251,7 @@ components:
       description: The entity tag received from GET or a prior mutation. Prevents lost updates.
       schema:
         type: string
+        pattern: '^"[0-9]+"$'
         example: '"3"'
     Suburb:
       name: suburb
@@ -308,9 +346,16 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
+    ServiceUnavailable:
+      description: Object storage has not been enabled in this deployment.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
   schemas:
     CreatePropertyRequest:
       type: object
+      description: Currency defaults to MNT on create. On replacement, omission preserves the existing currency.
       required: [title, propertyType, listingType, address]
       properties:
         title:
@@ -321,9 +366,12 @@ components:
           $ref: '#/components/schemas/PropertyType'
         listingType:
           $ref: '#/components/schemas/ListingType'
+        currency:
+          $ref: '#/components/schemas/PriceCurrency'
         price:
           type: number
           minimum: 0
+          maximum: 9999999999.99
           multipleOf: 0.01
         bedrooms:
           type: integer
@@ -340,6 +388,8 @@ components:
         landSizeSqm:
           type: number
           minimum: 0
+          maximum: 99999999.99
+          multipleOf: 0.01
         address:
           $ref: '#/components/schemas/Address'
     UpdatePropertyRequest:
@@ -353,7 +403,7 @@ components:
           $ref: '#/components/schemas/PropertyStatus'
     Property:
       type: object
-      required: [id, agentId, title, propertyType, listingType, address, status, version, createdAt, updatedAt]
+      required: [id, agentId, title, propertyType, listingType, currency, address, status, version, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -361,6 +411,8 @@ components:
         agentId:
           type: string
           format: uuid
+        currency:
+          $ref: '#/components/schemas/PriceCurrency'
         title:
           type: string
         propertyType:
@@ -434,6 +486,9 @@ components:
     ListingType:
       type: string
       enum: [SALE, RENT]
+    PriceCurrency:
+      type: string
+      enum: [MNT, AUD]
     PropertyStatus:
       type: string
       enum: [DRAFT, ACTIVE, UNDER_OFFER, SOLD, RENTED, WITHDRAWN]

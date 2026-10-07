@@ -1,10 +1,14 @@
+server:
+  tomcat:
+    max-http-form-post-size: 64KB
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: listing-service
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:listing_db}
     username: ${DB_USERNAME:listing_user}
-    password: ${DB_PASSWORD:listing_password}
+    password: ${DB_PASSWORD}
   jpa:
     open-in-view: false
     hibernate:
@@ -16,20 +20,33 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${IDENTITY_ISSUER_URI:http://localhost:9000}
+          jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:9000/oauth2/jwks}
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info
   endpoint:
     health:
       probes:
         enabled: true
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId}] %logger{36} - %msg%n"
 app:
+  bounds:
+    enabled: ${REQUEST_BOUNDS_ENABLED:false}
+  identity-internal-url: ${IDENTITY_INTERNAL_URL:http://localhost:9000}
+  internal-key: ${INTERNAL_SERVICE_KEY:}
+  account-revocation:
+    enabled: ${ACCOUNT_REVOCATION_ENABLED:false}
+  notifications:
+    enabled: ${NOTIFICATIONS_ENABLED:false}
   media:
+    enabled: ${MEDIA_ENABLED:false}
     bucket: ${MEDIA_S3_BUCKET:domain-listing-media-dev}
     region: ${AWS_REGION:ap-southeast-2}
     presign-duration: ${MEDIA_PRESIGN_DURATION:PT10M}
+  search-url: ${SEARCH_INTERNAL_URL:http://localhost:8000}
+  outbox:
+    enabled: ${OUTBOX_DELIVERY_ENABLED:false}

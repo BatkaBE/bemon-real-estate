@@ -28,7 +28,7 @@ public class KeystoreSigningKeyConfiguration {
             keyStore.load(input, properties.keystorePassword().toCharArray());
             final Key key = keyStore.getKey(properties.keyAlias(), properties.keyPassword().toCharArray());
             final Certificate certificate = keyStore.getCertificate(properties.keyAlias());
-            if (!(key instanceof PrivateKey privateKey)
+            if (certificate == null || !(key instanceof PrivateKey privateKey)
                     || !(privateKey instanceof RSAPrivateKey rsaPrivateKey)
                     || !(certificate.getPublicKey() instanceof RSAPublicKey rsaPublicKey)) {
                 throw new IllegalStateException("Signing keystore alias must contain an RSA private key and certificate");
