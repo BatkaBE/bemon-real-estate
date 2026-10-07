@@ -4,6 +4,7 @@ import { createRemoteJWKSet, EncryptJWT, jwtDecrypt, jwtVerify } from 'jose';
 import { settings } from './config';
 import type { Session } from './types';
 import { randomUUID } from 'node:crypto';
+// Stable credential identifiers preserve signed sessions across the GerHub rebrand.
 export const SESSION_COOKIE = 'bemon_session';
 export const FLOW_COOKIE = 'bemon_oauth_flow';
 const COOKIE_LIMIT_BYTES = 3800;

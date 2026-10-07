@@ -1,6 +1,7 @@
 /** Applies version-checked local mitigations for upstream advisories without a patched release. */
 const fs = require('node:fs');
 const path = require('node:path');
+// Preserve the marker so previously hardened installs remain idempotent after rebranding.
 const marker = 'BEMON_SECURITY_MITIGATION';
 const root = path.resolve(__dirname, '../node_modules');
 /** Requires an exact upstream anchor and applies once; unexpected dependency updates fail visibly. */

@@ -1,4 +1,4 @@
-# Domain Platform Infrastructure
+# GerHub Platform Infrastructure
 
 Infrastructure, deployment, and observability definitions for the platform.
 

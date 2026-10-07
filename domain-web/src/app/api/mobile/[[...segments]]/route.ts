@@ -16,7 +16,7 @@ async function route(request: NextRequest, context: { params: Promise<{ segments
     if (name === 'exchange' && request.method === 'POST') {
       const body = await readJson(request);
       if (typeof body.code !== 'string' || body.code.length > 2048 || typeof body.verifier !== 'string' || !/^[A-Za-z0-9._~-]{43,128}$/.test(body.verifier)
-          || typeof body.nonce !== 'string' || body.nonce.length > 128 || !['bemon://oauth', `${config.mobileWebOrigin}/oauth`].includes(String(body.redirectUri))) throw new ApiError(400);
+          || typeof body.nonce !== 'string' || body.nonce.length > 128 || !['gerhub://oauth', 'bemon://oauth', `${config.mobileWebOrigin}/oauth`].includes(String(body.redirectUri))) throw new ApiError(400);
       const exchange = await fetch(`${config.identityInternal}/oauth2/token`, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(12000),
         headers: { Authorization: `Basic ${Buffer.from(`${config.mobileClientId}:${config.mobileClientSecret}`).toString('base64')}` },
         body: new URLSearchParams({ grant_type: 'authorization_code', code: body.code, code_verifier: body.verifier, redirect_uri: String(body.redirectUri) }) });

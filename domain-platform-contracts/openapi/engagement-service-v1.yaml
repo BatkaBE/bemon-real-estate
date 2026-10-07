@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Bemon Listing engagement and featured placements
+  title: GerHub Listing engagement and featured placements
   version: 1.0.0
   description: Supplemental Listing contract. Identity is always the verified access-token subject.
 servers: [{url: 'http://localhost:8080/v1'}]

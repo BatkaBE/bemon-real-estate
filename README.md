@@ -1,6 +1,8 @@
-# Domain Platform Workspace
+# GerHub — Real Estate Platform
 
-This workspace contains the Bemon real-estate platform's implemented Identity, Listing, Search and Payment services, Mongolian/MNT Next.js web client, and Expo Android/iOS application.
+This workspace contains the GerHub real-estate platform's implemented Identity, Listing, Search and Payment services, Mongolian/MNT Next.js web client, and Expo Android/iOS application.
+
+The product name is GerHub. Existing `bemon-local` Compose volumes, `BEMON_*` settings, session/storage keys, search index and seed identifiers retain their stable names so the rebrand preserves local data and signed sessions. Native builds use `mn.gerhub.app` and `gerhub://oauth`; existing mobile OAuth clients gain the new callback without changing their stored secret or removing earlier redirects.
 
 | Repository | Responsibility | Primary stack |
 | --- | --- | --- |
@@ -29,7 +31,7 @@ bash scripts/local.sh smoke
 
 `verify` builds the three executable JARs and runs unit and disposable PostgreSQL integration tests. Use `bash scripts/local.sh build` to rebuild the JARs without running tests before starting the stack.
 
-Open [Bemon](http://localhost:3000). The APIs are [Identity](http://localhost:9000/.well-known/openid-configuration) and [Listing](http://localhost:8080/v1/properties?currency=MNT). Search is localhost:8001, Payment localhost:8081, local SMTP inbox localhost:8025. Databases, Redis and OpenSearch are accessible only inside Compose. HTTP ports bind to loopback. `.local.env` contains private credentials and is ignored by Git. The administrator email defaults to `admin@bemon.local`; the seeded agent defaults to `agent@bemon.local`. Their passwords are in that file. Administrators provision agents through the web dashboard; public registration creates buyers.
+Open [GerHub](http://localhost:3000). The APIs are [Identity](http://localhost:9000/.well-known/openid-configuration) and [Listing](http://localhost:8080/v1/properties?currency=MNT). Search is localhost:8001, Payment localhost:8081, local SMTP inbox localhost:8025. Databases, Redis and OpenSearch are accessible only inside Compose. HTTP ports bind to loopback. `.local.env` contains private credentials and is ignored by Git. Fresh settings default to `admin@gerhub.local` and `agent@gerhub.local`; existing installations retain their accounts and use the emails/passwords already in that file. Administrators provision agents through the web dashboard; public registration creates buyers.
 
 The interface uses Mongolian, new listings default to MNT, and the public catalog filters MNT explicitly. V5 preserves existing Australian listings and retained responses as AUD without converting their prices. The seed creates six labelled synthetic Mongolian listings; repeated seed runs preserve existing records.
 

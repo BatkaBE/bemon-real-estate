@@ -10,7 +10,7 @@ class ProviderGatewayTest {
     private Transport http;
     private ProviderGateway gateway;
     /** Builds a deterministic merchant transport fixture. */
-    @BeforeEach void setup(){http=mock(Transport.class);gateway=new ProviderGateway(http,new MockEnvironment(),"qpay","https://merchant.test","client","secret","INVOICE","https://bemon.test");
+    @BeforeEach void setup(){http=mock(Transport.class);gateway=new ProviderGateway(http,new MockEnvironment(),"qpay","https://merchant.test","client","secret","INVOICE","https://gerhub.test");
         when(http.send(endsWith("/v2/auth/token"),any(),any(),any(),any())).thenReturn(Map.of("access_token","provider-token","expires_in",3600));}
     /** Invoice writes use a stable order reference and cache the provider token. */
     @Test void uniqueReferenceAndTokenCache(){when(http.send(endsWith("/v2/invoice"),any(),any(),any(),any())).thenReturn(Map.of("invoice_id","invoice"));UUID id=UUID.randomUUID();gateway.create(id,UUID.randomUUID(),new BigDecimal("20000"),"nonce");gateway.create(UUID.randomUUID(),UUID.randomUUID(),new BigDecimal("20000"),"nonce");

@@ -197,9 +197,18 @@ public class AuthorizationServerConfiguration {
     /** Registers a confidential mobile BFF client; no client secret is shipped to the native app. */
     @Bean
     public CommandLineRunner initializeMobileClient(final RegisteredClientRepository clients,final PasswordEncoder encoder,@Value("${OAUTH_MOBILE_CLIENT_SECRET:}") final String secret) {
-        return ignored->{if(!secret.isBlank()&&clients.findByClientId("domain-mobile")==null)clients.save(RegisteredClient.withId(UUID.randomUUID().toString()).clientId("domain-mobile").clientSecret(encoder.encode(secret))
+        return ignored->{
+            if(secret.isBlank())return;
+            final var existing=clients.findByClientId("domain-mobile");
+            if(existing!=null){
+                // Append the renamed native callback while preserving stored credentials and legacy redirects.
+                if(!existing.getRedirectUris().contains("gerhub://oauth"))
+                    clients.save(RegisteredClient.from(existing).redirectUri("gerhub://oauth").build());
+                return;
+            }
+            clients.save(RegisteredClient.withId(UUID.randomUUID().toString()).clientId("domain-mobile").clientSecret(encoder.encode(secret))
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-            .redirectUri("bemon://oauth").redirectUri("http://localhost:8082/oauth").scope(OidcScopes.OPENID).scope(OidcScopes.PROFILE)
+            .redirectUri("gerhub://oauth").redirectUri("http://localhost:8082/oauth").scope(OidcScopes.OPENID).scope(OidcScopes.PROFILE)
             .clientSettings(ClientSettings.builder().requireProofKey(true).build()).tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(15)).refreshTokenTimeToLive(Duration.ofDays(30)).reuseRefreshTokens(false).build()).build());};
     }
 

@@ -1,4 +1,4 @@
-# Domain Platform Contracts
+# GerHub Platform Contracts
 
 The source of truth for cross-repository interfaces:
 

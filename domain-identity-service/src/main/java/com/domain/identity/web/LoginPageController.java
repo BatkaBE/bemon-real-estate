@@ -19,7 +19,7 @@ public class LoginPageController {
                 : "<p class=error role=alert>Имэйл эсвэл нууц үг буруу байна.</p>";
         final String html = """
                 <!doctype html><html lang="mn"><head><meta charset="utf-8">
-                <meta name="viewport" content="width=device-width,initial-scale=1"><title>Нэвтрэх | Bemon</title>
+                <meta name="viewport" content="width=device-width,initial-scale=1"><title>Нэвтрэх | GerHub</title>
                 <style>*{box-sizing:border-box}body{margin:0;background:#f4f5ed;color:#19372e;font-family:Arial,sans-serif;
                 min-height:100vh;display:grid;place-items:center;padding:24px}main{background:white;width:100%%;
                 max-width:440px;border:1px solid #e2e8e1;border-radius:16px;padding:40px}h1{font-size:28px;letter-spacing:-1px;
@@ -29,7 +29,7 @@ public class LoginPageController {
                 button{width:100%%;padding:15px;border:0;border-radius:7px;background:#245944;color:white;font-weight:bold;
                 margin-top:28px;cursor:pointer}input:focus,button:focus-visible{outline:2px solid #669a6c;outline-offset:3px}
                 .error{color:#8e4534;background:#fff5f2;padding:13px;border-radius:7px}</style></head><body><main>
-                <div class=brand>bemon.</div><h1>Тавтай морил.</h1><p>Бүртгэлтэй имэйл, нууц үгээ оруулна уу.</p>%s
+                <div class=brand>GerHub</div><h1>Тавтай морил.</h1><p>Бүртгэлтэй имэйл, нууц үгээ оруулна уу.</p>%s
                 <form action="/login" method="post"><label for="username">Имэйл</label>
                 <input id="username" name="username" type="email" autocomplete="username" required autofocus>
                 <label for="password">Нууц үг</label><input id="password" name="password" type="password"

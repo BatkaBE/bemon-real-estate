@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Domain Listing Service API
+  title: GerHub Listing Service API
   version: 1.0.0
   description: |
     The source-of-truth REST contract for property listing management and public discovery.

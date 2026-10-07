@@ -1,4 +1,4 @@
-# Bemon Payments
+# GerHub Payments
 
 Spring Boot3.5.16 / Java17 matches the existing workspace; PostgreSQL owns immutable orders, double-entry ledger, subscriptions/credits and the entitlement outbox.
 

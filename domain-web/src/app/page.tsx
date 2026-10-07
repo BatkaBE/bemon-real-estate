@@ -28,7 +28,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const filtered = ['suburb', 'listingType', 'propertyType', 'minPrice', 'maxPrice', 'minBedrooms', 'q', 'radiusKm'].some(key => value(key));
   return <>
     <section className="hero"><div className="container hero-inner"><div className="hero-copy"><span className="eyebrow"><span className="tiny-dot" /> ҮЛ ХӨДЛӨХ ХӨРӨНГӨ</span>
-      <h1>Танд тохирох<br /><em>орон зай.</em></h1><p>Шинэ амьдралын эхлэл, өөрийн гэсэн гэр. <br />Дараагийн алхмаа Bemon-той хамт хийгээрэй.</p>
+      <h1>Танд тохирох<br /><em>орон зай.</em></h1><p>Шинэ амьдралын эхлэл, өөрийн гэсэн гэр. <br />Дараагийн алхмаа GerHub-той хамт хийгээрэй.</p>
       <div className="hero-actions"><a href="#listings" className="button">Заруудыг үзэх <span aria-hidden="true">↗</span></a><span className="hero-subnote">Худалдах · Түрээслэх</span></div>
     </div><div className="hero-art"><Architecture /><div className="hero-art-label"><span>ӨӨРИЙН ГЭСЭН ОРОН ЗАЙ</span><span>UB / MONGOLIA</span></div></div></div></section>
     <div className="container"><form action="/#listings" method="get" className="search-panel" aria-label="Зар шүүх">

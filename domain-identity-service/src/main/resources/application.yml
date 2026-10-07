@@ -50,7 +50,7 @@ app:
   internal-key: ${INTERNAL_SERVICE_KEY:}
   mail:
     enabled: ${MAIL_ENABLED:false}
-    from: ${SMTP_FROM:no-reply@bemon.local}
+    from: ${SMTP_FROM:no-reply@gerhub.local}
   bootstrap:
     enabled: ${DEV_ADMIN_BOOTSTRAP_ENABLED:false}
     email: ${DEV_ADMIN_EMAIL:}

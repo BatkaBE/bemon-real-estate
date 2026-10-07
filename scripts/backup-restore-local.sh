@@ -5,8 +5,8 @@ umask 077
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_root"
 compose=(docker compose --env-file .local.env -f domain-platform-infra/compose.local.yaml)
-backup_dir="$(mktemp -d /tmp/bemon-restore.XXXXXX)"
-restore_container="bemon-restore-$(openssl rand -hex 6)"
+backup_dir="$(mktemp -d /tmp/gerhub-restore.XXXXXX)"
+restore_container="gerhub-restore-$(openssl rand -hex 6)"
 export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
 cleanup() { docker stop "$restore_container" >/dev/null 2>&1 || true; }
 trap cleanup EXIT

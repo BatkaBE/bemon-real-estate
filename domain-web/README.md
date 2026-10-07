@@ -1,4 +1,4 @@
-# Bemon веб MVP
+# GerHub веб MVP
 
 Монгол интерфейс, MNT каталог, SSR зарын дэлгэрэнгүй болон агентын удирдлагын хэсэг. Next.js 16.3.8, React 19.3.0, TypeScript, jose ашиглана. Node.js 22+ шаардлагатай.
 
@@ -15,7 +15,7 @@ bash scripts/local.sh seed
 
 Веб: http://localhost:3000. `up` нь production Next.js image build хийнэ; host дээр npm install заавал хийхгүй. `seed` зургаан **Жишээ** гэсэн шошготой синтетик MNT зар болон локал агент нэмнэ. Дахин ажиллуулахад байгаа зар, account, password-ийг солихгүй. `stop` өгөгдлийн volume-уудыг хадгална.
 
-Админ: `admin@bemon.local`; агент: `agent@bemon.local`. Нууц үгс root-ийн Git-д орохгүй `.local.env` дахь `DEV_ADMIN_PASSWORD`, `DEV_AGENT_PASSWORD`. Нууц утгуудыг тайлан, screenshot, Git-д хуулж болохгүй.
+Шинэ тохиргоонд админ: `admin@gerhub.local`; агент: `agent@gerhub.local`. Одоо байгаа installation-ийн бүртгэлүүд хадгалагдана; бодит имэйл, нууц үгс root-ийн Git-д орохгүй `.local.env` дахь `DEV_ADMIN_EMAIL`, `DEV_AGENT_EMAIL`, `DEV_ADMIN_PASSWORD`, `DEV_AGENT_PASSWORD`. Нууц утгуудыг тайлан, screenshot, Git-д хуулж болохгүй.
 
 Public бүртгэл buyer үүсгэнэ. Админ `/dashboard`-оос агент үүсгэнэ. Агент өөрийн заруудаа жагсаах, MNT ноорог үүсгэх, засах, нийтлэх, төлөв шилжүүлэх боломжтой. MNT түрээсийн үнийг сараар оруулна. AUD зарын үнэ, хугацааг автоматаар хөрвүүлэхгүй.
 

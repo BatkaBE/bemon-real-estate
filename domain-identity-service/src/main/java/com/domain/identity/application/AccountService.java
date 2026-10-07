@@ -106,7 +106,7 @@ public class AccountService {
         db.update("INSERT INTO account_tokens(token_hash,user_id,purpose,expires_at) VALUES(?,?,?,?)",
                 digest(token), userId, purpose, java.sql.Timestamp.from(now.plusSeconds(purpose.equals("RESET") ? 1800 : 86400)));
         final String route = purpose.equals("RESET") ? "/reset-password" : "/verify-email";
-        enqueue(email, purpose.equals("RESET") ? "Bemon — нууц үг сэргээх" : "Bemon — имэйл баталгаажуулах",
+        enqueue(email, purpose.equals("RESET") ? "GerHub — нууц үг сэргээх" : "GerHub — имэйл баталгаажуулах",
                 "Дараах холбоосоор орно уу. Холбоос нэг удаа үйлчилнэ.\n" + webOrigin + route + "?token=" + token);
     }
 

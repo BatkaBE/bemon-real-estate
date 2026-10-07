@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN bash -c 'source rl_env_gpu_clean/bin/activate && pip install --no-cache-dir -r requirements.txt'
 COPY app app
 COPY tests tests
-RUN groupadd -g 10001 bemon && useradd -u 10001 -g bemon -M bemon
+RUN groupadd -g 10001 gerhub && useradd -u 10001 -g gerhub -M gerhub
 USER 10001:10001
 EXPOSE 8000
 CMD ["bash", "-c", "source rl_env_gpu_clean/bin/activate && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]

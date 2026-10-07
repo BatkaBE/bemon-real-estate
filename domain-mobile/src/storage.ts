@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { HandleStorage } from './api';
+// Keep the stable storage key for builds that already hold an opaque session.
 const KEY = 'bemon.device.session';
 let webHandle: string | null = null;
 /** Native handles use Keychain/Keystore; the optional web preview retains its handle only in memory. */

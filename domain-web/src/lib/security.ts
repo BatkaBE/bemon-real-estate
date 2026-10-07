@@ -2,8 +2,8 @@
 export function safeReturnPath(value: string | null | undefined, fallback = '/dashboard'): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\r\n]/.test(value)) return fallback;
   try {
-    const parsed = new URL(value, 'https://bemon.invalid');
-    return parsed.origin === 'https://bemon.invalid' ? parsed.pathname + parsed.search : fallback;
+    const parsed = new URL(value, 'https://gerhub.invalid');
+    return parsed.origin === 'https://gerhub.invalid' ? parsed.pathname + parsed.search : fallback;
   } catch { return fallback; }
 }
 /** Cookie-authenticated mutations require an exact browser origin, including its port. */

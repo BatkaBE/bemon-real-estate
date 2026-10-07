@@ -109,13 +109,13 @@ test('native BFF verifies mobile PKCE, stores only an opaque handle, rejects tam
   for (const endpoint of [
     `${identity}/v1/users/me`, `${listing}/v1/users/me/favorites`,
     `http://localhost:${process.env.BEMON_PAYMENT_PORT || 8081}/v1/users/me/payments`,
-    `http://localhost:${process.env.BEMON_SEARCH_PORT || 8001}/v1/users/me/searches`,
+    `http://localhost:${process.env.BEMON_SEARCH_PORT || 8000}/v1/users/me/searches`,
   ]) {
     expect((await fetch(endpoint, { headers: { Authorization: `Bearer ${applicationTokens.access_token}` } })).status).toBe(200);
     expect((await fetch(endpoint, { headers: { Authorization: `Bearer ${applicationTokens.id_token}` } })).status).toBe(401);
   }
-  const nonce = randomUUID(); const authorization = await tokens(buyer, newSecret, { clientId: 'domain-mobile', redirectUri: 'bemon://oauth', scope: 'openid profile', nonce, codeOnly: true });
-  const response = await request.post('/api/mobile/exchange', { data: { code: authorization.code, verifier: authorization.verifier, nonce, redirectUri: 'bemon://oauth' } }); expect(response.status()).toBe(200);
+  const nonce = randomUUID(); const authorization = await tokens(buyer, newSecret, { clientId: 'domain-mobile', redirectUri: 'gerhub://oauth', scope: 'openid profile', nonce, codeOnly: true });
+  const response = await request.post('/api/mobile/exchange', { data: { code: authorization.code, verifier: authorization.verifier, nonce, redirectUri: 'gerhub://oauth' } }); expect(response.status()).toBe(200);
   const { handle } = await response.json(); expect(handle.split('.')).toHaveLength(5); const headers = { Authorization: `Bearer ${handle}` };
   const profile = await request.get('/api/mobile/account', { headers }); expect(profile.status()).toBe(200); expect((await profile.json()).email).toBe(buyer);
   const encryptionKey = Buffer.from(process.env.WEB_SESSION_SECRET!, 'hex');

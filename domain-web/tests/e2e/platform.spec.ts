@@ -35,6 +35,8 @@ async function logout(page: Page, context: BrowserContext) {
 test('Mongolian MNT catalog, search, detail, and desktop layout use actual backend data', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'mn');
+  await expect(page).toHaveTitle('GerHub — Таны дараагийн орон зай');
+  await expect(page.getByRole('link', { name: 'GerHub нүүр', exact: true })).toContainText('GerHub');
   await expect(page.getByRole('heading', { name: 'Танд тохирох орон зай.' })).toBeVisible();
   await expect(page.locator('.property-card').first()).toBeVisible();
   await expect(page.locator('.card-bottom').first()).toContainText('₮');

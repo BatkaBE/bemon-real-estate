@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Bemon Identity API
+  title: GerHub Identity API
   version: 1.0.0
   description: |
     Account APIs use JSON and bearer tokens. Browser login and OAuth2 Authorization Code + PKCE

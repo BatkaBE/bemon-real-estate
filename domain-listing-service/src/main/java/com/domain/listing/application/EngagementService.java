@@ -70,7 +70,7 @@ public class EngagementService {
         if(!buyerId.toString().equals(profile.get("id").toString())) throw new PropertyOwnershipException();
         db.update("INSERT INTO inquiries(id,property_id,buyer_id,agent_id,buyer_name,buyer_email,buyer_phone,message,request_hash) VALUES(?,?,?,?,?,?,?,?,?)",
                 key,propertyId,buyerId,property.getAgentId(),profile.get("displayName"),profile.get("email"),profile.get("phone"),message,hash);
-        notify(property.getAgentId(),"Bemon — шинэ хүсэлт","Таны зарын талаар хүсэлт ирлээ. Dashboard-ийн хүсэлтүүд хэсгээс үзнэ үү.");
+        notify(property.getAgentId(),"GerHub — шинэ хүсэлт","Таны зарын талаар хүсэлт ирлээ. Dashboard-ийн хүсэлтүүд хэсгээс үзнэ үү.");
         return view(db.queryForMap("SELECT * FROM inquiries WHERE id=?",key));
     }
     /** Lists only a participant's own conversations with stable keyset pagination. */
@@ -91,7 +91,7 @@ public class EngagementService {
         if(!agentId.equals(row.get("agent_id"))) throw new PropertyOwnershipException();
         if(((Number)row.get("version")).longValue()!=version) throw new StalePropertyVersionException();
         db.update("UPDATE inquiries SET reply=?,status=?,version=version+1,updated_at=now() WHERE id=?",reply,status,id);
-        notify((UUID)row.get("buyer_id"),"Bemon — хүсэлтийн хариу","Агент таны хүсэлтэд хариуллаа. Миний хүсэлтүүд хэсгээс үзнэ үү.");
+        notify((UUID)row.get("buyer_id"),"GerHub — хүсэлтийн хариу","Агент таны хүсэлтэд хариуллаа. Миний хүсэлтүүд хэсгээс үзнэ үү.");
         return view(db.queryForMap("SELECT * FROM inquiries WHERE id=?",id));
     }
     /** Queues notifications atomically with conversation changes. */

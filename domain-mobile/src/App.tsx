@@ -34,7 +34,7 @@ export default function App() {
   const [inquiry, setInquiry] = useState(''); const [searchName, setSearchName] = useState(''); const [emailEnabled, setEmailEnabled] = useState(false);
   const loadVersion = useRef(0);
   const nonce = useMemo(() => Crypto.randomUUID(), []);
-  const redirectUri = Platform.OS === 'web' ? `${window.location.origin}/oauth` : AuthSession.makeRedirectUri({ scheme: 'bemon', path: 'oauth' });
+  const redirectUri = Platform.OS === 'web' ? `${window.location.origin}/oauth` : AuthSession.makeRedirectUri({ scheme: 'gerhub', path: 'oauth' });
   const discovery = { authorizationEndpoint: `${IDENTITY}/oauth2/authorize` };
   const [request, response, promptAsync] = AuthSession.useAuthRequest({ clientId: 'domain-mobile', redirectUri, scopes: ['openid', 'profile'], responseType: AuthSession.ResponseType.Code, usePKCE: true, extraParams: { nonce } }, discovery);
   const inquiryKey = useMemo(() => Crypto.randomUUID(), [selected?.id, inquiry]);
@@ -70,7 +70,7 @@ export default function App() {
   /** Formats the API's currency without converting or relabeling stored values. */
   function price(item: Property) { return item.price === null ? 'Үнэ тохирно' : `${new Intl.NumberFormat('mn-MN').format(item.price)} ${item.currency === 'MNT' ? '₮' : 'AUD'}${item.listingType === 'RENT' ? ' / сар' : ''}`; }
 
-  return <SafeAreaView style={styles.root}><StatusBar style="dark" /><View style={styles.header}><Text style={styles.brand}>bemon.</Text><Text style={styles.tagline}>Таны дараагийн орон зай</Text></View>
+  return <SafeAreaView style={styles.root}><StatusBar style="dark" /><View style={styles.header}><Text style={styles.brand}>GerHub</Text><Text style={styles.tagline}>Таны дараагийн орон зай</Text></View>
     <ScrollView horizontal style={styles.tabs} contentContainerStyle={styles.tabRow}>{TABS.map(item => <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} key={item.id} style={[styles.tab, tab === item.id && styles.activeTab]} onPress={() => { setSelected(null); setTab(item.id); }}><Text style={styles.tabText}>{item.title}</Text></Pressable>)}</ScrollView>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {!signedIn && <Button title="Нэвтрэх" disabled={!request || busy} onPress={() => { void promptAsync().catch(() => setMessage('Нэвтрэх цонх нээгдсэнгүй.')); }} />}

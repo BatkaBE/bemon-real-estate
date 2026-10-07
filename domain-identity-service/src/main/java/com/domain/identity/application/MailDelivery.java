@@ -24,7 +24,7 @@ public class MailDelivery {
     private final JavaMailSender sender;
     private final String from;
     /** Supplies SMTP transport and the private outbox. */
-    public MailDelivery(final JdbcTemplate db,final JavaMailSender sender,@Value("${app.mail.from:no-reply@bemon.local}") final String from) {
+    public MailDelivery(final JdbcTemplate db,final JavaMailSender sender,@Value("${app.mail.from:no-reply@gerhub.local}") final String from) {
         this.db=db;this.sender=sender;this.from=from;
     }
     /** Competing workers claim rows in one transaction; a crash can duplicate an email, never a token use. */

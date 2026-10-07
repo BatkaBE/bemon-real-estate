@@ -25,7 +25,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field, model_validator
 
-LOGGER = logging.getLogger("bemon.search")
+LOGGER = logging.getLogger("gerhub.search")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/search_db")
 OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
@@ -198,7 +198,7 @@ def deliver_index() -> None:
                         inserted = db.execute("INSERT INTO alerts(id,search_id,property_id,user_id,title) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(search_id,property_id) DO NOTHING RETURNING id",
                                               (alert_id, search["id"], job["id"], search["user_id"], data["title"])).fetchone()
                         if inserted and search["email_enabled"]:
-                            db.execute("INSERT INTO email_jobs(id,user_id,subject,body) VALUES(%s,%s,%s,%s)", (alert_id, search["user_id"], "Bemon — хайлтад тохирох зар", "Хадгалсан хайлтад тохирох зар нэмэгдлээ. Bemon-ийн мэдэгдэл хэсгээс үзнэ үү."))
+                            db.execute("INSERT INTO email_jobs(id,user_id,subject,body) VALUES(%s,%s,%s,%s)", (alert_id, search["user_id"], "GerHub — хайлтад тохирох зар", "Хадгалсан хайлтад тохирох зар нэмэгдлээ. GerHub-ийн мэдэгдэл хэсгээс үзнэ үү."))
                 db.execute("DELETE FROM index_jobs WHERE id=%s AND version=%s", (job["id"], job["version"]))
                 try:
                     CACHE.incr("bemon:search:generation")
@@ -249,7 +249,7 @@ async def lifespan(_: FastAPI) -> Iterator[None]:
     thread.join(timeout=6)
 
 
-app = FastAPI(title="Bemon Search", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="GerHub Search", lifespan=lifespan, docs_url=None, redoc_url=None)
 
 
 @app.middleware("http")

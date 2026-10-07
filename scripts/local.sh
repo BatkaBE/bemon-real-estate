@@ -14,7 +14,7 @@ initialize_settings() {
       printf 'WEB_SESSION_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$settings_file"
     fi
     if ! grep -q '^DEV_AGENT_EMAIL=' "$settings_file"; then
-      printf 'DEV_AGENT_EMAIL=agent@bemon.local\n' >> "$settings_file"
+      printf 'DEV_AGENT_EMAIL=agent@gerhub.local\n' >> "$settings_file"
       printf "DEV_AGENT_PASSWORD='Agent#%s'\n" "$(openssl rand -hex 16)" >> "$settings_file"
     fi
     for setting in INTERNAL_SERVICE_KEY SEARCH_DB_PASSWORD PAYMENT_DB_PASSWORD OAUTH_MOBILE_CLIENT_SECRET; do
@@ -33,12 +33,12 @@ initialize_settings() {
       printf '%s=%s\n' "$setting" "$(openssl rand -hex 32)"
     done
     printf 'OAUTH_WEB_CLIENT_SECRET=%s\n' "$(openssl rand -hex 32)"
-    printf 'DEV_ADMIN_EMAIL=admin@bemon.local\n'
+    printf 'DEV_ADMIN_EMAIL=admin@gerhub.local\n'
     printf "DEV_ADMIN_PASSWORD='Local#%s'\n" "$(openssl rand -hex 16)"
     printf 'WEB_SESSION_SECRET=%s\n' "$(openssl rand -hex 32)"
-    printf 'DEV_AGENT_EMAIL=agent@bemon.local\n'
+    printf 'DEV_AGENT_EMAIL=agent@gerhub.local\n'
     printf "DEV_AGENT_PASSWORD='Agent#%s'\n" "$(openssl rand -hex 16)"
-    printf 'BEMON_IDENTITY_PORT=9000\nBEMON_LISTING_PORT=8080\n'
+    printf 'BEMON_IDENTITY_PORT=9000\nBEMON_LISTING_PORT=8080\nBEMON_SEARCH_PORT=8001\n'
   } > "$settings_temp"
   mv -n "$settings_temp" "$settings_file"
   echo "Generated private local settings in .local.env; retain this file with the database volumes."

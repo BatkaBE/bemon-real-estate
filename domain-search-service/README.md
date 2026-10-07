@@ -1,4 +1,4 @@
-# Bemon Search
+# GerHub Search
 
 Python 3.13, FastAPI, PostgreSQL inbox/projections/jobs, OpenSearch 3.9, Redis shared rate buckets.
 

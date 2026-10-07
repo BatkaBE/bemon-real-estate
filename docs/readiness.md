@@ -1,8 +1,10 @@
-# Bemon — локал платформын бэлэн байдлын тайлан
+# GerHub — локал платформын бэлэн байдлын тайлан
 
 Шалгасан огноо: **2026-10-07, Asia/Ulaanbaatar**. Хэрэглэгчийн хүрээ: **байршуулалт болон бодит зураг/media-гаас бусад ажил**.
 
 Монгол/MNT веб, Identity/Listing/Payment/Search үйлчилгээ, Expo Android/iOS код болон локал runtime холбогдсон. Доорх нь бодит локал шалгалтын үр дүн; production нэвтрүүлсэн гэсэн тайлан биш.
+
+Бүтээгдэхүүний нэр GerHub. Веб/мобайл wordmark, хуудасны metadata, Identity нэвтрэх дэлгэц, шинэ имэйл/төлбөрийн тайлбар болон API баримт бичиг энэ нэрийг хэрэглэнэ. Native identifiers: `mn.gerhub.app`, `gerhub://oauth`; өмнөх OAuth client-ийн secret/session болон Compose data/index нэршлүүдийг хадгалж шинэ callback нэмнэ.
 
 ## Хэрэгжүүлсэн
 

@@ -1,4 +1,4 @@
-# Domain Identity Service
+# GerHub Identity Service
 
 Owns user accounts, roles, authentication, authorization, and token lifecycle.
 

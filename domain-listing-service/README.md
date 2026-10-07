@@ -1,4 +1,4 @@
-# Domain Listing Service
+# GerHub Listing Service
 
 Additional public favorites/inquiries/featured endpoints are described by the [engagement contract](../domain-platform-contracts/openapi/engagement-service-v1.yaml). Account access-token scope, web/mobile audience and epoch checks reject ID tokens and revoked credentials in the local platform.
 

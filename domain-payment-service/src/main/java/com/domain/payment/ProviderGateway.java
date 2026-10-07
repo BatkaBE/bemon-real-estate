@@ -29,7 +29,7 @@ public class ProviderGateway {
     public Map<String,Object> create(final UUID id,final UUID user,final BigDecimal amount,final String nonce){
         if(name().equals("LOCAL_TEST"))return Map.of("invoice_id",id.toString(),"test",true,"message","Туршилтын төлбөр — бодит мөнгө шилжихгүй.");
         return http.send(url+"/v2/invoice","POST",Map.of("invoice_code",code,"sender_invoice_no",id.toString(),"invoice_receiver_code",user.toString(),
-                "invoice_description","Bemon "+id,"amount",amount,"callback_url",callback+"/v1/payments/callback/"+id+"?token="+nonce),"Authorization","Bearer "+access());
+                "invoice_description","GerHub "+id,"amount",amount,"callback_url",callback+"/v1/payments/callback/"+id+"?token="+nonce),"Authorization","Bearer "+access());
     }
     /** Confirms provider evidence after an authenticated callback hint, never from callback body claims. */
     public Receipt check(final String invoice){
@@ -55,7 +55,7 @@ public class ProviderGateway {
     public void refund(final String receipt){
         if(name().equals("LOCAL_TEST"))return;
         if(receipt.contains(","))throw new IllegalArgumentException("Multiple receipts require provider reconciliation");
-        http.send(url+"/v2/payment/refund/"+java.net.URLEncoder.encode(receipt,StandardCharsets.UTF_8),"DELETE",Map.of("note","Bemon refund"),"Authorization","Bearer "+access());
+        http.send(url+"/v2/payment/refund/"+java.net.URLEncoder.encode(receipt,StandardCharsets.UTF_8),"DELETE",Map.of("note","GerHub refund"),"Authorization","Bearer "+access());
         final var confirmed=http.send(url+"/v2/payment/"+java.net.URLEncoder.encode(receipt,StandardCharsets.UTF_8),"GET",null,"Authorization","Bearer "+access());
         if(!"REFUNDED".equals(confirmed.get("payment_status")))throw new IllegalStateException("Refund not confirmed by provider");
     }
